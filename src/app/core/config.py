@@ -8,8 +8,8 @@ class Config:
     DATA_DIR: Path = BASE_DIR / 'saved_data'
     CATEGORIES_DIR: Path = DATA_DIR / 'categories'
 
-    RUSTORE_URL: str = 'www.rustore.ru'
-    RUSTORE_CATALOG_URL: str = urljoin(RUSTORE_URL, 'catalog')
+    RUSTORE_URL: str = 'https://www.rustore.ru'
+    RUSTORE_CATALOG_URL: str = urljoin(RUSTORE_URL, 'catalog/')
     RUSTORE_APP_NAME_PREFIX: str = '/catalog/app/'
     RUSTORE_CATEGORIES: list[str] = [
         'finance',
