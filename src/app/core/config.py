@@ -9,6 +9,7 @@ class Config:
 
     RUSTORE_URL: str = 'www.rustore.ru'
     RUSTORE_CATALOG_URL: str = urljoin(RUSTORE_URL, 'catalog')
+    RUSTORE_APP_NAME_PREFIX: str = '/catalog/app/'
     RUSTORE_CATEGORIES: list[str] = [
         'finance',
         'state',
