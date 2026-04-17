@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 class Config:
     BASE_DIR: Path = Path(__file__).parent.parent.parent.parent
     DATA_DIR: Path = BASE_DIR / 'saved_data'
+    CATEGORIES_DIR: Path = DATA_DIR / 'categories'
 
     RUSTORE_URL: str = 'www.rustore.ru'
     RUSTORE_CATALOG_URL: str = urljoin(RUSTORE_URL, 'catalog')
@@ -32,6 +33,7 @@ class Config:
         'gambling',
         'foodanddrink',
     ]
+    RUSTORE_PAGES_COUNT: int = 10
 
 
 @lru_cache
