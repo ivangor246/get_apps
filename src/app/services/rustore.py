@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from playwright.async_api import async_playwright
 
@@ -12,7 +13,9 @@ logger = logging.getLogger(__name__)
 class RustoreService:
     @staticmethod
     async def collect_all_categories() -> None:
-        config.CATEGORIES_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
+        output_dir = config.CATEGORIES_DIR / timestamp
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         async with async_playwright() as p:
             browser = await p.chromium.launch()
@@ -23,7 +26,7 @@ class RustoreService:
                     try:
                         apps = await RustoreParser.parse_category(context, category, config.RUSTORE_PAGES_COUNT)
 
-                        output_file = config.CATEGORIES_DIR / f'{category}.txt'
+                        output_file = output_dir / f'{category}.txt'
                         output_file.write_text('\n'.join(apps), encoding='utf-8')
 
                         logger.info('Category "%s" scanned successfully: %d apps found', category, len(apps))
