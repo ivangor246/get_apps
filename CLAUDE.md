@@ -140,7 +140,7 @@ Weak success criteria ("make it work") require constant clarification — avoid 
 ## Git
 
 - **Never run git commands** (commit, push, rebase, etc.) without an explicit user request.
-- At the end of every response that changes code, provide a suggested commit message in a code block:
+- At the end of every response that changes code, provide a short suggested commit message in a code block:
 
 ```
 feat: add JWT refresh token rotation
