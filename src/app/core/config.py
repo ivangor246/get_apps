@@ -9,6 +9,7 @@ class Config:
     DATA_DIR: Path = BASE_DIR / 'saved_data'
     CATEGORIES_DIR: Path = DATA_DIR / 'categories'
     DATABASES_DIR: Path = DATA_DIR / 'databases'
+    CHROMA_DIR: Path = DATA_DIR / 'chroma'
 
     CATEGORIES_TIMESTAMP_FORMAT: str = '%d_%m_%Y_%H_%M_%S'
 

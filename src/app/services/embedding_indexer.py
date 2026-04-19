@@ -1,11 +1,13 @@
+import asyncio
 import json
 import logging
 
+from chromadb.api.models.Collection import Collection
 from sqlalchemy import text
 
 from app.core import OllamaClient
+from app.core.chroma import build_chroma_client, get_app_collection
 from app.core.db import build_engine, build_sessionmaker, init_db
-from app.core.vec import serialize_vector
 
 logger = logging.getLogger(__name__)
 
@@ -13,21 +15,25 @@ _DESCRIPTION_CHAR_LIMIT = 2000
 
 
 class EmbeddingIndexerService:
-    """Index app_info rows into the sqlite-vec app_embeddings table."""
+    """Index app_info rows into a Chroma collection of embeddings."""
 
     def __init__(self, db_name: str, batch_size: int = 32) -> None:
         self.db_name = db_name
         self.batch_size = batch_size
 
     async def run(self) -> None:
-        """Embed every app that doesn't yet have a stored vector."""
+        """Embed every app that doesn't yet have a stored vector in Chroma."""
         engine = build_engine(self.db_name)
         session_factory = build_sessionmaker(engine)
         await init_db(engine)
 
+        chroma_client = build_chroma_client(self.db_name)
+        collection = get_app_collection(chroma_client)
+
         try:
-            pending = await self._load_pending(session_factory)
-            logger.info('Apps pending embedding: %d', len(pending))
+            indexed_ids = await asyncio.to_thread(_load_indexed_ids, collection)
+            pending = await self._load_pending(session_factory, indexed_ids)
+            logger.info('Apps pending embedding: %d (already indexed: %d)', len(pending), len(indexed_ids))
             if not pending:
                 return
 
@@ -40,33 +46,26 @@ class EmbeddingIndexerService:
                     except Exception:
                         logger.exception('Embedding batch failed at offset %d', start)
                         continue
-                    await self._persist_batch(session_factory, batch, vectors)
+                    await asyncio.to_thread(
+                        collection.add,
+                        ids=[row['app_id'] for row in batch],
+                        embeddings=vectors,
+                    )
                     logger.info('Indexed %d/%d', min(start + self.batch_size, len(pending)), len(pending))
         finally:
             await engine.dispose()
 
     @staticmethod
-    async def _load_pending(session_factory) -> list[dict]:
-        """Return rows from app_info that are missing an embedding."""
-        query = text(
-            'SELECT app_id, name, description, categories '
-            'FROM app_info '
-            'WHERE app_id NOT IN (SELECT app_id FROM app_embeddings)'
-        )
+    async def _load_pending(session_factory, indexed_ids: set[str]) -> list[dict]:
+        """Return rows from app_info that are not yet in the Chroma collection."""
+        query = text('SELECT app_id, name, description, categories FROM app_info')
         async with session_factory() as session:
             result = await session.execute(query)
-            return [dict(row._mapping) for row in result.all()]
-
-    @staticmethod
-    async def _persist_batch(session_factory, rows: list[dict], vectors: list[list[float]]) -> None:
-        """Insert one batch of (app_id, embedding) pairs in a single transaction."""
-        async with session_factory() as session:
-            for row, vector in zip(rows, vectors, strict=True):
-                await session.execute(
-                    text('INSERT INTO app_embeddings(app_id, embedding) VALUES (:app_id, :embedding)'),
-                    {'app_id': row['app_id'], 'embedding': serialize_vector(vector)},
-                )
-            await session.commit()
+            return [
+                dict(row._mapping)
+                for row in result.all()
+                if row._mapping['app_id'] not in indexed_ids
+            ]
 
     @staticmethod
     def _build_text(row: dict) -> str:
@@ -91,3 +90,9 @@ class EmbeddingIndexerService:
         if description:
             parts.append(description)
         return '\n\n'.join(parts)
+
+
+def _load_indexed_ids(collection: Collection) -> set[str]:
+    """Return the set of app_ids currently stored in the Chroma collection."""
+    data = collection.get(include=[])
+    return set(data.get('ids') or [])

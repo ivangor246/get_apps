@@ -2,6 +2,7 @@ import json
 import logging
 from dataclasses import dataclass
 
+from chromadb.api.models.Collection import Collection
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core import OllamaClient
@@ -41,9 +42,14 @@ class RAGResponse:
 class RAGService:
     """Orchestrate filter extraction, retrieval, and answer generation."""
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], client: OllamaClient) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        client: OllamaClient,
+        collection: Collection,
+    ) -> None:
         self._client = client
-        self._retrieval = RetrievalService(session_factory, client)
+        self._retrieval = RetrievalService(session_factory, client, collection)
 
     async def answer(self, query: str, top_k: int | None = None) -> RAGResponse:
         """Run the full RAG pipeline for a user query."""

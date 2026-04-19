@@ -26,7 +26,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     apps_parser.add_argument('--concurrency', type=int, default=3, help='Parallel page fetches (default: 3).')
 
-    index_parser = sub.add_parser('index', help='Embed app_info rows into the sqlite-vec app_embeddings table.')
+    index_parser = sub.add_parser('index', help='Embed app_info rows into the Chroma collection.')
     index_parser.add_argument('--db', required=True, help='SQLite database name (stored under saved_data/databases/).')
     index_parser.add_argument('--batch-size', type=int, default=32, help='Embedding batch size (default: 32).')
 

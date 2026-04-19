@@ -17,7 +17,7 @@
 - `playwright` — headless-браузер для обхода анти-бота RuStore
 - `sqlalchemy[asyncio]`, `aiosqlite` — async ORM + SQLite-драйвер
 - `httpx` — HTTP-клиент для Ollama
-- `sqlite-vec` — расширение SQLite для векторного поиска
+- `chromadb` — локальное persistent векторное хранилище (HNSW)
 - `fastapi`, `uvicorn[standard]` — REST API для RAG
 
 Dev: `ruff`.
@@ -71,7 +71,7 @@ make collect-apps DB=<name> [FOLDER=<timestamp>] [CONCURRENCY=<N>]
 make index DB=<name> [BATCH_SIZE=<N>]
 ```
 
-Считает эмбеддинги `bge-m3` для каждого приложения без вектора и кладёт в vec0-таблицу `app_embeddings` той же БД. `BATCH_SIZE` по умолчанию 32.
+Считает эмбеддинги `bge-m3` для каждого приложения без вектора и кладёт в Chroma-коллекцию `apps` в `saved_data/chroma/<name>/`. `BATCH_SIZE` по умолчанию 32.
 
 ### Запуск RAG API
 
@@ -133,12 +133,13 @@ poetry run python -m app.main serve  --db <name> [--host 127.0.0.1] [--port 8000
 src/app/
 ├── main.py                 # CLI
 ├── api/                    # FastAPI (create_app, routes, schemas)
-├── core/                   # config, db, ollama, sqlite-vec
+├── core/                   # config, db, ollama, chroma
 ├── models/                 # ORM (AppInfo)
 ├── services/               # парсеры, сбор, индексация, retrieval, RAG
 └── tasks/                  # точки входа CLI для каждой команды
 
 saved_data/
 ├── categories/<timestamp>/<category>.txt
-└── databases/<name>.sqlite3
+├── databases/<name>.sqlite3
+└── chroma/<name>/          # persistent Chroma-хранилище эмбеддингов
 ```
