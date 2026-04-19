@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import logging
 
-from app.tasks import run_rustore_app_info_tasks, run_rustore_tasks
+from app.tasks import run_index_task, run_rustore_app_info_tasks, run_rustore_tasks
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,6 +26,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     apps_parser.add_argument('--concurrency', type=int, default=3, help='Parallel page fetches (default: 3).')
 
+    index_parser = sub.add_parser('index', help='Embed app_info rows into the sqlite-vec app_embeddings table.')
+    index_parser.add_argument('--db', required=True, help='SQLite database name (stored under saved_data/databases/).')
+    index_parser.add_argument('--batch-size', type=int, default=32, help='Embedding batch size (default: 32).')
+
     return parser
 
 
@@ -35,6 +39,8 @@ async def _dispatch(args: argparse.Namespace) -> None:
         await run_rustore_tasks()
     elif args.mode == 'apps':
         await run_rustore_app_info_tasks(db_name=args.db, folder_name=args.folder, concurrency=args.concurrency)
+    elif args.mode == 'index':
+        await run_index_task(db_name=args.db, batch_size=args.batch_size)
 
 
 if __name__ == '__main__':
