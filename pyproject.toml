@@ -27,6 +27,7 @@ httpx = "^0.28.1"
 chromadb = "^0.5.20"
 fastapi = "^0.115.0"
 uvicorn = {extras = ["standard"], version = "^0.32.0"}
+tokenizers = "^0.22.2"
 
 
 [tool.poetry.group.dev.dependencies]
