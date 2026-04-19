@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import math
 
 from chromadb.api.models.Collection import Collection
 from sqlalchemy import text
@@ -12,6 +13,7 @@ from app.core.db import build_engine, build_sessionmaker, init_db
 logger = logging.getLogger(__name__)
 
 _DESCRIPTION_CHAR_LIMIT = 2000
+_MIN_CHUNK_CHARS = 2
 
 
 class EmbeddingIndexerService:
@@ -56,22 +58,49 @@ class EmbeddingIndexerService:
         finally:
             await engine.dispose()
 
-    @staticmethod
+    @classmethod
     async def _embed_individually(
-        client: OllamaClient, batch: list[dict], texts: list[str]
+        cls, client: OllamaClient, batch: list[dict], texts: list[str]
     ) -> tuple[list[str], list[list[float]]]:
-        """Retry a failed batch one text at a time, isolating the offending row(s)."""
+        """Retry a failed batch one text at a time, splitting NaN-producing inputs."""
         ids: list[str] = []
         vectors: list[list[float]] = []
         for row, text_value in zip(batch, texts, strict=True):
             try:
-                vector = await client.embed(text_value)
+                vector = await cls._embed_with_split(client, text_value)
             except Exception:
                 logger.exception('Embedding failed for app_id=%s', row['app_id'])
                 continue
             ids.append(row['app_id'])
             vectors.append(vector)
         return ids, vectors
+
+    @classmethod
+    async def _embed_with_split(cls, client: OllamaClient, text_value: str) -> list[float]:
+        """Embed text; on failure, split in half at whitespace and average the halves.
+
+        Works around a bge-m3/Ollama numerical bug that returns NaN for certain
+        token sequences. Recursion guarantees every non-empty fragment of the
+        original text contributes to the final vector.
+        """
+        try:
+            return await client.embed(text_value)
+        except Exception:
+            if len(text_value) <= _MIN_CHUNK_CHARS:
+                raise
+        mid = len(text_value) // 2
+        cut = text_value.rfind(' ', 0, mid)
+        if cut <= 0:
+            cut = text_value.find(' ', mid)
+        if cut <= 0:
+            cut = mid
+        left = text_value[:cut].strip()
+        right = text_value[cut:].strip()
+        pieces = [p for p in (left, right) if p]
+        if not pieces:
+            raise RuntimeError('Cannot split text further')
+        vectors = [await cls._embed_with_split(client, p) for p in pieces]
+        return _average_unit(vectors)
 
     @staticmethod
     async def _load_pending(session_factory, indexed_ids: set[str]) -> list[dict]:
@@ -122,3 +151,16 @@ def _load_indexed_ids(collection: Collection) -> set[str]:
     """Return the set of app_ids currently stored in the Chroma collection."""
     data = collection.get(include=[])
     return set(data.get('ids') or [])
+
+
+def _average_unit(vectors: list[list[float]]) -> list[float]:
+    """Mean-pool embeddings and L2-normalize so the result is a unit vector."""
+    if len(vectors) == 1:
+        return vectors[0]
+    dim = len(vectors[0])
+    n = len(vectors)
+    avg = [sum(v[i] for v in vectors) / n for i in range(dim)]
+    norm = math.sqrt(sum(x * x for x in avg))
+    if norm == 0:
+        return avg
+    return [x / norm for x in avg]
