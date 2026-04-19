@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urljoin
@@ -38,6 +39,18 @@ class Config:
         'foodanddrink',
     ]
     RUSTORE_PAGES_COUNT: int = 10
+
+    OLLAMA_URL: str = os.getenv('OLLAMA_URL', 'http://localhost:11434')
+    OLLAMA_LLM_MODEL: str = os.getenv('OLLAMA_LLM_MODEL', 'gemma4:e2b')
+    OLLAMA_EMBEDDING_MODEL: str = os.getenv('OLLAMA_EMBEDDING_MODEL', 'bge-m3')
+    OLLAMA_TIMEOUT: float = float(os.getenv('OLLAMA_TIMEOUT', '120'))
+
+    EMBEDDING_DIM: int = int(os.getenv('EMBEDDING_DIM', '1024'))
+    RAG_TOP_K: int = int(os.getenv('RAG_TOP_K', '20'))
+    RAG_CANDIDATE_K: int = int(os.getenv('RAG_CANDIDATE_K', '500'))
+
+    API_HOST: str = os.getenv('API_HOST', '127.0.0.1')
+    API_PORT: int = int(os.getenv('API_PORT', '8000'))
 
 
 @lru_cache
