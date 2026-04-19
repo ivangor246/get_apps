@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import logging
 
-from app.tasks import run_index_task, run_rustore_app_info_tasks, run_rustore_tasks
+from app.tasks import run_index_task, run_rustore_app_info_tasks, run_rustore_tasks, run_serve_task
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,6 +30,11 @@ def _build_parser() -> argparse.ArgumentParser:
     index_parser.add_argument('--db', required=True, help='SQLite database name (stored under saved_data/databases/).')
     index_parser.add_argument('--batch-size', type=int, default=32, help='Embedding batch size (default: 32).')
 
+    serve_parser = sub.add_parser('serve', help='Run the RAG FastAPI backend.')
+    serve_parser.add_argument('--db', required=True, help='SQLite database name (stored under saved_data/databases/).')
+    serve_parser.add_argument('--host', default=None, help='Bind host (default: API_HOST from config).')
+    serve_parser.add_argument('--port', type=int, default=None, help='Bind port (default: API_PORT from config).')
+
     return parser
 
 
@@ -41,6 +46,8 @@ async def _dispatch(args: argparse.Namespace) -> None:
         await run_rustore_app_info_tasks(db_name=args.db, folder_name=args.folder, concurrency=args.concurrency)
     elif args.mode == 'index':
         await run_index_task(db_name=args.db, batch_size=args.batch_size)
+    elif args.mode == 'serve':
+        await run_serve_task(db_name=args.db, host=args.host, port=args.port)
 
 
 if __name__ == '__main__':
