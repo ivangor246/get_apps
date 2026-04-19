@@ -44,16 +44,34 @@ class EmbeddingIndexerService:
                     try:
                         vectors = await client.embed_batch(texts)
                     except Exception:
-                        logger.exception('Embedding batch failed at offset %d', start)
-                        continue
-                    await asyncio.to_thread(
-                        collection.add,
-                        ids=[row['app_id'] for row in batch],
-                        embeddings=vectors,
-                    )
+                        logger.warning(
+                            'Embedding batch failed at offset %d, falling back to per-item', start
+                        )
+                        ids, vectors = await self._embed_individually(client, batch, texts)
+                    else:
+                        ids = [row['app_id'] for row in batch]
+                    if ids:
+                        await asyncio.to_thread(collection.add, ids=ids, embeddings=vectors)
                     logger.info('Indexed %d/%d', min(start + self.batch_size, len(pending)), len(pending))
         finally:
             await engine.dispose()
+
+    @staticmethod
+    async def _embed_individually(
+        client: OllamaClient, batch: list[dict], texts: list[str]
+    ) -> tuple[list[str], list[list[float]]]:
+        """Retry a failed batch one text at a time, isolating the offending row(s)."""
+        ids: list[str] = []
+        vectors: list[list[float]] = []
+        for row, text_value in zip(batch, texts, strict=True):
+            try:
+                vector = await client.embed(text_value)
+            except Exception:
+                logger.exception('Embedding failed for app_id=%s', row['app_id'])
+                continue
+            ids.append(row['app_id'])
+            vectors.append(vector)
+        return ids, vectors
 
     @staticmethod
     async def _load_pending(session_factory, indexed_ids: set[str]) -> list[dict]:
@@ -69,9 +87,13 @@ class EmbeddingIndexerService:
 
     @staticmethod
     def _build_text(row: dict) -> str:
-        """Assemble the text to embed from name, categories and description."""
-        name = row.get('name') or ''
-        description = (row.get('description') or '')[:_DESCRIPTION_CHAR_LIMIT]
+        """Assemble the text to embed from name, categories and description.
+
+        Empty/whitespace-only fields are ignored. Falls back to app_id so the
+        input is never empty (Ollama returns NaN embeddings for blank input).
+        """
+        name = (row.get('name') or '').strip()
+        description = (row.get('description') or '').strip()[:_DESCRIPTION_CHAR_LIMIT]
         categories_raw = row.get('categories')
         if isinstance(categories_raw, str):
             try:
@@ -79,16 +101,20 @@ class EmbeddingIndexerService:
             except json.JSONDecodeError:
                 pass
         if isinstance(categories_raw, list):
-            categories = ', '.join(str(c) for c in categories_raw)
+            categories = ', '.join(str(c).strip() for c in categories_raw if str(c).strip())
         elif isinstance(categories_raw, str):
-            categories = categories_raw
+            categories = categories_raw.strip()
         else:
             categories = ''
-        parts = [name]
+        parts: list[str] = []
+        if name:
+            parts.append(name)
         if categories:
             parts.append(f'Категории: {categories}')
         if description:
             parts.append(description)
+        if not parts:
+            parts.append(str(row.get('app_id') or ''))
         return '\n\n'.join(parts)
 
 
