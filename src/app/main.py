@@ -55,4 +55,7 @@ async def _dispatch(args: argparse.Namespace) -> None:
 
 if __name__ == '__main__':
     parsed = _build_parser().parse_args()
-    asyncio.run(_dispatch(parsed))
+    try:
+        asyncio.run(_dispatch(parsed))
+    except KeyboardInterrupt:
+        logging.getLogger(__name__).warning('Interrupted by user.')
