@@ -29,6 +29,9 @@ def _build_parser() -> argparse.ArgumentParser:
     index_parser = sub.add_parser('index', help='Embed app_info rows into the Chroma collection.')
     index_parser.add_argument('--db', required=True, help='SQLite database name (stored under saved_data/databases/).')
     index_parser.add_argument('--batch-size', type=int, default=32, help='Embedding batch size (default: 32).')
+    index_parser.add_argument(
+        '--concurrency', type=int, default=1, help='Parallel embedding batches in flight (default: 1).'
+    )
 
     serve_parser = sub.add_parser('serve', help='Run the RAG FastAPI backend.')
     serve_parser.add_argument('--db', required=True, help='SQLite database name (stored under saved_data/databases/).')
@@ -45,7 +48,7 @@ async def _dispatch(args: argparse.Namespace) -> None:
     elif args.mode == 'apps':
         await run_rustore_app_info_tasks(db_name=args.db, folder_name=args.folder, concurrency=args.concurrency)
     elif args.mode == 'index':
-        await run_index_task(db_name=args.db, batch_size=args.batch_size)
+        await run_index_task(db_name=args.db, batch_size=args.batch_size, concurrency=args.concurrency)
     elif args.mode == 'serve':
         await run_serve_task(db_name=args.db, host=args.host, port=args.port)
 

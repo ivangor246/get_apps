@@ -20,7 +20,7 @@ collect-apps:
 
 index:
 	@test -n "$(DB)" || (echo "DB argument is required: make index DB=myname" && exit 1)
-	poetry run python -m app.main index --db $(DB) $(if $(BATCH_SIZE),--batch-size $(BATCH_SIZE),)
+	poetry run python -m app.main index --db $(DB) $(if $(BATCH_SIZE),--batch-size $(BATCH_SIZE),) $(if $(CONCURRENCY),--concurrency $(CONCURRENCY),)
 
 serve:
 	@test -n "$(DB)" || (echo "DB argument is required: make serve DB=myname" && exit 1)

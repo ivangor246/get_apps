@@ -19,9 +19,12 @@ _MIN_CHUNK_CHARS = 2
 class EmbeddingIndexerService:
     """Index app_info rows into a Chroma collection of embeddings."""
 
-    def __init__(self, db_name: str, batch_size: int = 32) -> None:
+    def __init__(self, db_name: str, batch_size: int = 32, concurrency: int = 1) -> None:
+        if concurrency < 1:
+            raise ValueError('concurrency must be >= 1')
         self.db_name = db_name
         self.batch_size = batch_size
+        self.concurrency = concurrency
 
     async def run(self) -> None:
         """Embed every app that doesn't yet have a stored vector in Chroma."""
@@ -39,22 +42,34 @@ class EmbeddingIndexerService:
             if not pending:
                 return
 
+            batches = [
+                pending[start : start + self.batch_size]
+                for start in range(0, len(pending), self.batch_size)
+            ]
+            semaphore = asyncio.Semaphore(self.concurrency)
+            write_lock = asyncio.Lock()
+            total = len(pending)
+            done = 0
+
             async with OllamaClient() as client:
-                for start in range(0, len(pending), self.batch_size):
-                    batch = pending[start : start + self.batch_size]
-                    texts = [self._build_text(row) for row in batch]
-                    try:
-                        vectors = await client.embed_batch(texts)
-                    except Exception:
-                        logger.warning(
-                            'Embedding batch failed at offset %d, falling back to per-item', start
-                        )
-                        ids, vectors = await self._embed_individually(client, batch, texts)
-                    else:
-                        ids = [row['app_id'] for row in batch]
-                    if ids:
-                        await asyncio.to_thread(collection.add, ids=ids, embeddings=vectors)
-                    logger.info('Indexed %d/%d', min(start + self.batch_size, len(pending)), len(pending))
+                async def process(batch: list[dict]) -> None:
+                    nonlocal done
+                    async with semaphore:
+                        texts = [self._build_text(row) for row in batch]
+                        try:
+                            vectors = await client.embed_batch(texts)
+                        except Exception:
+                            logger.warning('Embedding batch failed, falling back to per-item')
+                            ids, vectors = await self._embed_individually(client, batch, texts)
+                        else:
+                            ids = [row['app_id'] for row in batch]
+                    async with write_lock:
+                        if ids:
+                            await asyncio.to_thread(collection.add, ids=ids, embeddings=vectors)
+                        done += len(batch)
+                        logger.info('Indexed %d/%d', done, total)
+
+                await asyncio.gather(*(process(b) for b in batches))
         finally:
             await engine.dispose()
 
