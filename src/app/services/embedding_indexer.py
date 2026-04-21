@@ -2,7 +2,9 @@ import asyncio
 import json
 import logging
 import math
+import re
 import signal
+import unicodedata
 
 from chromadb.api.models.Collection import Collection
 from sqlalchemy import bindparam, text
@@ -15,6 +17,17 @@ logger = logging.getLogger(__name__)
 
 _DESCRIPTION_CHAR_LIMIT = 2000
 _MIN_CHUNK_CHARS = 2
+_WHITESPACE_RE = re.compile(r'\s+')
+_DROP_CATEGORIES = frozenset({'So', 'Sk', 'Cs', 'Cf', 'Co'})
+
+
+def _clean_text(value: str) -> str:
+    """NFKC-normalize, drop emoji/decorative symbols, collapse whitespace."""
+    normalized = unicodedata.normalize('NFKC', value)
+    filtered = ''.join(
+        ch for ch in normalized if unicodedata.category(ch) not in _DROP_CATEGORIES
+    )
+    return _WHITESPACE_RE.sub(' ', filtered).strip()
 
 
 class EmbeddingIndexerService:
@@ -187,8 +200,8 @@ class EmbeddingIndexerService:
         Empty/whitespace-only fields are ignored. Falls back to app_id so the
         input is never empty (Ollama returns NaN embeddings for blank input).
         """
-        name = (row.get('name') or '').strip()
-        description = (row.get('description') or '').strip()[:_DESCRIPTION_CHAR_LIMIT]
+        name = _clean_text(row.get('name') or '')
+        description = _clean_text(row.get('description') or '')[:_DESCRIPTION_CHAR_LIMIT]
         categories_raw = row.get('categories')
         if isinstance(categories_raw, str):
             try:
@@ -196,9 +209,11 @@ class EmbeddingIndexerService:
             except json.JSONDecodeError:
                 pass
         if isinstance(categories_raw, list):
-            categories = ', '.join(str(c).strip() for c in categories_raw if str(c).strip())
+            categories = ', '.join(
+                cleaned for c in categories_raw if (cleaned := _clean_text(str(c)))
+            )
         elif isinstance(categories_raw, str):
-            categories = categories_raw.strip()
+            categories = _clean_text(categories_raw)
         else:
             categories = ''
         parts: list[str] = []
