@@ -3,7 +3,6 @@ import json
 import logging
 import math
 import re
-import signal
 import unicodedata
 
 from chromadb.api.models.Collection import Collection
@@ -69,66 +68,30 @@ class EmbeddingIndexerService:
             ]
             semaphore = asyncio.Semaphore(self.concurrency)
             write_lock = asyncio.Lock()
-            stop_event = asyncio.Event()
             total = len(pending)
             done = 0
 
-            loop = asyncio.get_running_loop()
-            main_task = asyncio.current_task()
-            sigint_hits = 0
+            async def process(batch: list[dict]) -> None:
+                nonlocal done
+                async with semaphore:
+                    chunks_per_row = [
+                        _chunk_text(self._build_text(row)) for row in batch
+                    ]
+                    flat_texts = [c for chunks in chunks_per_row for c in chunks]
+                    flat_vectors = await self.embedder.embed_passages(flat_texts)
+                    ids = [row['app_id'] for row in batch]
+                    vectors: list[list[float]] = []
+                    offset = 0
+                    for chunks in chunks_per_row:
+                        n = len(chunks)
+                        vectors.append(_average_unit(flat_vectors[offset : offset + n]))
+                        offset += n
+                async with write_lock:
+                    await asyncio.to_thread(collection.add, ids=ids, embeddings=vectors)
+                    done += len(batch)
+                    logger.info('Indexed %d/%d', done, total)
 
-            def _on_sigint() -> None:
-                nonlocal sigint_hits
-                sigint_hits += 1
-                if sigint_hits == 1:
-                    logger.warning(
-                        'SIGINT received: finishing in-flight batches, no new ones will start. '
-                        'Press Ctrl+C again to force quit.'
-                    )
-                    stop_event.set()
-                else:
-                    logger.warning('Second SIGINT: forcing cancellation.')
-                    if main_task is not None:
-                        main_task.cancel()
-
-            sigint_installed = False
-            try:
-                loop.add_signal_handler(signal.SIGINT, _on_sigint)
-                sigint_installed = True
-            except NotImplementedError:
-                pass
-
-            try:
-                async def process(batch: list[dict]) -> None:
-                    nonlocal done
-                    if stop_event.is_set():
-                        return
-                    async with semaphore:
-                        if stop_event.is_set():
-                            return
-                        chunks_per_row = [
-                            _chunk_text(self._build_text(row)) for row in batch
-                        ]
-                        flat_texts = [c for chunks in chunks_per_row for c in chunks]
-                        flat_vectors = await self.embedder.embed_passages(flat_texts)
-                        ids = [row['app_id'] for row in batch]
-                        vectors: list[list[float]] = []
-                        offset = 0
-                        for chunks in chunks_per_row:
-                            n = len(chunks)
-                            vectors.append(_average_unit(flat_vectors[offset : offset + n]))
-                            offset += n
-                    async with write_lock:
-                        await asyncio.to_thread(collection.add, ids=ids, embeddings=vectors)
-                        done += len(batch)
-                        logger.info('Indexed %d/%d', done, total)
-
-                await asyncio.gather(*(process(b) for b in batches))
-            finally:
-                if sigint_installed:
-                    loop.remove_signal_handler(signal.SIGINT)
-                if stop_event.is_set():
-                    logger.info('Stopped early: %d/%d indexed; rerun to continue.', done, total)
+            await asyncio.gather(*(process(b) for b in batches))
         finally:
             await engine.dispose()
 
