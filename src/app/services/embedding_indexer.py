@@ -12,10 +12,12 @@ from sqlalchemy import bindparam, text
 from app.core import OllamaClient
 from app.core.chroma import build_chroma_client, get_app_collection
 from app.core.db import build_engine, build_sessionmaker, init_db
+from app.core.exceptions import OllamaHTTPError
 
 logger = logging.getLogger(__name__)
 
 _DESCRIPTION_CHAR_LIMIT = 2000
+_CHUNK_CHAR_LIMIT = 1200
 _MIN_CHUNK_CHARS = 2
 _WHITESPACE_RE = re.compile(r'\s+')
 _DROP_CATEGORIES = frozenset({'So', 'Sk', 'Cs', 'Cf', 'Co'})
@@ -100,14 +102,35 @@ class EmbeddingIndexerService:
                         async with semaphore:
                             if stop_event.is_set():
                                 return
-                            texts = [self._build_text(row) for row in batch]
+                            chunks_per_row = [
+                                _chunk_text(self._build_text(row)) for row in batch
+                            ]
+                            flat_texts = [c for chunks in chunks_per_row for c in chunks]
                             try:
-                                vectors = await client.embed_batch(texts)
-                            except Exception:
-                                logger.warning('Embedding batch failed, falling back to per-item')
-                                ids, vectors = await self._embed_individually(client, batch, texts)
+                                flat_vectors = await client.embed_batch(flat_texts)
+                            except Exception as err:
+                                logger.warning(
+                                    'Embedding batch failed (rows=%d, chunks=%d, app_ids=%s, '
+                                    'chunk_lens=%s): %s; falling back to per-item',
+                                    len(batch),
+                                    len(flat_texts),
+                                    [row['app_id'] for row in batch],
+                                    [len(t) for t in flat_texts],
+                                    _format_ollama_error(err),
+                                )
+                                ids, vectors = await self._embed_individually(
+                                    client, batch, chunks_per_row
+                                )
                             else:
                                 ids = [row['app_id'] for row in batch]
+                                vectors = []
+                                offset = 0
+                                for chunks in chunks_per_row:
+                                    n = len(chunks)
+                                    vectors.append(
+                                        _average_unit(flat_vectors[offset : offset + n])
+                                    )
+                                    offset += n
                         async with write_lock:
                             if ids:
                                 await asyncio.to_thread(collection.add, ids=ids, embeddings=vectors)
@@ -125,23 +148,33 @@ class EmbeddingIndexerService:
 
     @classmethod
     async def _embed_individually(
-        cls, client: OllamaClient, batch: list[dict], texts: list[str]
+        cls, client: OllamaClient, batch: list[dict], chunks_per_row: list[list[str]]
     ) -> tuple[list[str], list[list[float]]]:
-        """Retry a failed batch one text at a time, splitting NaN-producing inputs."""
+        """Retry a failed batch row-by-row; per row embed each chunk and mean-pool."""
         ids: list[str] = []
         vectors: list[list[float]] = []
-        for row, text_value in zip(batch, texts, strict=True):
+        for row, chunks in zip(batch, chunks_per_row, strict=True):
             try:
-                vector = await cls._embed_with_split(client, text_value)
+                piece_vectors = [
+                    await cls._embed_with_split(client, row['app_id'], chunk)
+                    for chunk in chunks
+                ]
             except Exception:
-                logger.exception('Embedding failed for app_id=%s', row['app_id'])
+                logger.exception(
+                    'Embedding failed for app_id=%s (chunks=%d, total_len=%d)',
+                    row['app_id'],
+                    len(chunks),
+                    sum(len(c) for c in chunks),
+                )
                 continue
             ids.append(row['app_id'])
-            vectors.append(vector)
+            vectors.append(_average_unit(piece_vectors))
         return ids, vectors
 
     @classmethod
-    async def _embed_with_split(cls, client: OllamaClient, text_value: str) -> list[float]:
+    async def _embed_with_split(
+        cls, client: OllamaClient, app_id: str, text_value: str
+    ) -> list[float]:
         """Embed text; on failure, split in half at whitespace and average the halves.
 
         Works around a bge-m3/Ollama numerical bug that returns NaN for certain
@@ -150,7 +183,13 @@ class EmbeddingIndexerService:
         """
         try:
             return await client.embed(text_value)
-        except Exception:
+        except Exception as err:
+            logger.warning(
+                'Embed piece failed (app_id=%s, text_len=%d): %s',
+                app_id,
+                len(text_value),
+                _format_ollama_error(err),
+            )
             if len(text_value) <= _MIN_CHUNK_CHARS:
                 raise
         mid = len(text_value) // 2
@@ -164,7 +203,7 @@ class EmbeddingIndexerService:
         pieces = [p for p in (left, right) if p]
         if not pieces:
             raise RuntimeError('Cannot split text further')
-        vectors = [await cls._embed_with_split(client, p) for p in pieces]
+        vectors = [await cls._embed_with_split(client, app_id, p) for p in pieces]
         return _average_unit(vectors)
 
     @staticmethod
@@ -226,6 +265,48 @@ class EmbeddingIndexerService:
         if not parts:
             parts.append(str(row.get('app_id') or ''))
         return '\n\n'.join(parts)
+
+
+def _chunk_text(text_value: str) -> list[str]:
+    """Split text into pieces of at most _CHUNK_CHAR_LIMIT chars, preserving all content.
+
+    Prefers paragraph, then sentence, then word boundaries; falls back to a hard cut
+    only when no whitespace exists in the window. Short inputs are returned as-is.
+    """
+    if not text_value:
+        return ['']
+    if len(text_value) <= _CHUNK_CHAR_LIMIT:
+        return [text_value]
+    chunks: list[str] = []
+    remaining = text_value
+    while len(remaining) > _CHUNK_CHAR_LIMIT:
+        cut = _find_cut(remaining, _CHUNK_CHAR_LIMIT)
+        piece = remaining[:cut].strip()
+        if piece:
+            chunks.append(piece)
+        remaining = remaining[cut:].lstrip()
+    if remaining:
+        chunks.append(remaining)
+    return chunks or [text_value]
+
+
+def _find_cut(text_value: str, limit: int) -> int:
+    """Return best split index <= limit; prefers paragraph > sentence > word > hard cut."""
+    window = text_value[:limit]
+    min_cut = limit // 2
+    for sep in ('\n\n', '. ', '.\n', '! ', '? ', '\n', ' '):
+        idx = window.rfind(sep)
+        if idx >= min_cut:
+            return idx + len(sep)
+    return limit
+
+
+def _format_ollama_error(err: BaseException) -> str:
+    """Render an Ollama error with status code and response body for logs."""
+    if isinstance(err, OllamaHTTPError):
+        body = (err.body or '').strip().replace('\n', ' ')
+        return f'HTTP {err.status_code} {err.endpoint} body={body[:500]!r}'
+    return f'{type(err).__name__}: {err}'
 
 
 def _load_indexed_ids(collection: Collection) -> set[str]:
