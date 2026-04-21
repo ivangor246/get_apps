@@ -97,7 +97,11 @@ class TextEmbedder:
         return [vec.tolist() for vec in vectors]
 
     @staticmethod
-    def _providers_for(device: str) -> list[str]:
+    def _providers_for(device: str) -> list:
         if device.lower() == 'cuda':
-            return ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            cuda_options = {
+                'arena_extend_strategy': 'kSameAsRequested',
+                'gpu_mem_limit': config.EMBEDDING_GPU_MEM_LIMIT_MB * 1024 * 1024,
+            }
+            return [('CUDAExecutionProvider', cuda_options), 'CPUExecutionProvider']
         return ['CPUExecutionProvider']

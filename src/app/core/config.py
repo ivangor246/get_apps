@@ -50,6 +50,7 @@ class Config:
     EMBEDDING_DEVICE: str = os.getenv('EMBEDDING_DEVICE', 'cuda')
     EMBEDDING_DIM: int = int(os.getenv('EMBEDDING_DIM', '1024'))
     EMBEDDING_BATCH_SIZE: int = int(os.getenv('EMBEDDING_BATCH_SIZE', '8'))
+    EMBEDDING_GPU_MEM_LIMIT_MB: int = int(os.getenv('EMBEDDING_GPU_MEM_LIMIT_MB', '3072'))
     RAG_TOP_K: int = int(os.getenv('RAG_TOP_K', '20'))
     RAG_CANDIDATE_K: int = int(os.getenv('RAG_CANDIDATE_K', '500'))
 
