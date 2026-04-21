@@ -5,7 +5,7 @@ import math
 import signal
 
 from chromadb.api.models.Collection import Collection
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from app.core import OllamaClient
 from app.core.chroma import build_chroma_client, get_app_collection
@@ -156,15 +156,29 @@ class EmbeddingIndexerService:
 
     @staticmethod
     async def _load_pending(session_factory, indexed_ids: set[str]) -> list[dict]:
-        """Return rows from app_info that are not yet in the Chroma collection."""
-        query = text('SELECT app_id, name, description, categories FROM app_info')
+        """Return rows from app_info whose app_id is not yet in the Chroma collection.
+
+        Two-step to avoid materializing description/categories for already-indexed rows:
+        first fetch just the ids, then pull full rows for the pending subset in chunks
+        to stay under SQLite's bound-parameter limit.
+        """
         async with session_factory() as session:
-            result = await session.execute(query)
-            return [
-                dict(row._mapping)
-                for row in result.all()
-                if row._mapping['app_id'] not in indexed_ids
-            ]
+            id_rows = await session.execute(text('SELECT app_id FROM app_info'))
+            pending_ids = [row[0] for row in id_rows.all() if row[0] not in indexed_ids]
+            if not pending_ids:
+                return []
+
+            chunk_size = 500
+            select_sql = text(
+                'SELECT app_id, name, description, categories '
+                'FROM app_info WHERE app_id IN :ids'
+            ).bindparams(bindparam('ids', expanding=True))
+            rows: list[dict] = []
+            for start in range(0, len(pending_ids), chunk_size):
+                chunk = pending_ids[start : start + chunk_size]
+                result = await session.execute(select_sql, {'ids': chunk})
+                rows.extend(dict(row._mapping) for row in result.all())
+            return rows
 
     @staticmethod
     def _build_text(row: dict) -> str:

@@ -11,16 +11,22 @@ class RustoreParser:
     _semaphore: asyncio.Semaphore | None = None
 
     @classmethod
+    def set_concurrency(cls, limit: int) -> None:
+        """Configure the shared semaphore controlling parallel page fetches."""
+        cls._semaphore = asyncio.Semaphore(limit)
+
+    @classmethod
     def _get_semaphore(cls) -> asyncio.Semaphore:
+        """Return the shared semaphore, initializing a default (3) if unset."""
         if cls._semaphore is None:
             cls._semaphore = asyncio.Semaphore(3)
         return cls._semaphore
 
-    @staticmethod
-    async def _fetch_page(context: BrowserContext, category: str, page_num: int) -> list[str]:
+    @classmethod
+    async def _fetch_page(cls, context: BrowserContext, category: str, page_num: int) -> list[str]:
         url = urljoin(config.RUSTORE_CATALOG_URL, f'{category}/page-{page_num}')
 
-        async with RustoreParser._get_semaphore():
+        async with cls._get_semaphore():
             page = await context.new_page()
             try:
                 await page.goto(url, wait_until='networkidle')
@@ -33,10 +39,10 @@ class RustoreParser:
 
         return [link['href'].split('/')[-1] for link in links]
 
-    @staticmethod
-    async def parse_category(context: BrowserContext, category: str, page_limit: int = 10) -> list[str]:
+    @classmethod
+    async def parse_category(cls, context: BrowserContext, category: str, page_limit: int = 10) -> list[str]:
         results = await asyncio.gather(
-            *[RustoreParser._fetch_page(context, category, page) for page in range(1, page_limit + 1)]
+            *[cls._fetch_page(context, category, page) for page in range(1, page_limit + 1)]
         )
 
         return [app for page_apps in results for app in page_apps]

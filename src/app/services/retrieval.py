@@ -113,18 +113,21 @@ class RetrievalService:
 
     @staticmethod
     async def _median_downloads(session: AsyncSession) -> int:
-        """Compute the median of non-null downloads in app_info."""
+        """Compute the median of non-null downloads in app_info via window functions."""
         result = await session.execute(
-            text('SELECT downloads FROM app_info WHERE downloads IS NOT NULL ORDER BY downloads')
+            text(
+                'WITH ordered AS ('
+                ' SELECT downloads,'
+                ' ROW_NUMBER() OVER (ORDER BY downloads) AS rn,'
+                ' COUNT(*) OVER () AS cnt'
+                ' FROM app_info WHERE downloads IS NOT NULL'
+                ') '
+                'SELECT AVG(downloads) FROM ordered '
+                'WHERE rn IN ((cnt + 1) / 2, (cnt + 2) / 2)'
+            )
         )
-        values = [row[0] for row in result.all()]
-        if not values:
-            return 0
-        n = len(values)
-        mid = n // 2
-        if n % 2:
-            return int(values[mid])
-        return int((values[mid - 1] + values[mid]) // 2)
+        value = result.scalar()
+        return int(value) if value is not None else 0
 
     @staticmethod
     def _row_to_app(row: dict, distance: float) -> RetrievedApp:

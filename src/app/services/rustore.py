@@ -12,10 +12,12 @@ logger = logging.getLogger(__name__)
 
 class RustoreService:
     @staticmethod
-    async def collect_all_categories() -> None:
+    async def collect_all_categories(concurrency: int = 3) -> None:
         timestamp = datetime.now().strftime('%d_%m_%Y_%H_%M_%S')
         output_dir = config.CATEGORIES_DIR / timestamp
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        RustoreParser.set_concurrency(concurrency)
 
         async with async_playwright() as p:
             browser = await p.chromium.launch()
