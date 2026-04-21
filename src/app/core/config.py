@@ -49,6 +49,7 @@ class Config:
     EMBEDDING_MODEL: str = os.getenv('EMBEDDING_MODEL', 'intfloat/multilingual-e5-large')
     EMBEDDING_DEVICE: str = os.getenv('EMBEDDING_DEVICE', 'cuda')
     EMBEDDING_DIM: int = int(os.getenv('EMBEDDING_DIM', '1024'))
+    EMBEDDING_BATCH_SIZE: int = int(os.getenv('EMBEDDING_BATCH_SIZE', '8'))
     RAG_TOP_K: int = int(os.getenv('RAG_TOP_K', '20'))
     RAG_CANDIDATE_K: int = int(os.getenv('RAG_CANDIDATE_K', '500'))
 

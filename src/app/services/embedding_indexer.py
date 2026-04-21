@@ -110,9 +110,7 @@ class EmbeddingIndexerService:
                             _chunk_text(self._build_text(row)) for row in batch
                         ]
                         flat_texts = [c for chunks in chunks_per_row for c in chunks]
-                        flat_vectors = await self.embedder.embed_passages(
-                            flat_texts, batch_size=self.batch_size
-                        )
+                        flat_vectors = await self.embedder.embed_passages(flat_texts)
                         ids = [row['app_id'] for row in batch]
                         vectors: list[list[float]] = []
                         offset = 0
