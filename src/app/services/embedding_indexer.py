@@ -9,16 +9,14 @@ import unicodedata
 from chromadb.api.models.Collection import Collection
 from sqlalchemy import bindparam, text
 
-from app.core import OllamaClient
+from app.core import TextEmbedder
 from app.core.chroma import build_chroma_client, get_app_collection
 from app.core.db import build_engine, build_sessionmaker, init_db
-from app.core.exceptions import OllamaHTTPError
 
 logger = logging.getLogger(__name__)
 
 _DESCRIPTION_CHAR_LIMIT = 2000
-_CHUNK_CHAR_LIMIT = 1200
-_MIN_CHUNK_CHARS = 2
+_CHUNK_CHAR_LIMIT = 1000
 _WHITESPACE_RE = re.compile(r'\s+')
 _DROP_CATEGORIES = frozenset({'So', 'Sk', 'Cs', 'Cf', 'Co'})
 
@@ -35,10 +33,17 @@ def _clean_text(value: str) -> str:
 class EmbeddingIndexerService:
     """Index app_info rows into a Chroma collection of embeddings."""
 
-    def __init__(self, db_name: str, batch_size: int = 32, concurrency: int = 1) -> None:
+    def __init__(
+        self,
+        db_name: str,
+        embedder: TextEmbedder,
+        batch_size: int = 32,
+        concurrency: int = 1,
+    ) -> None:
         if concurrency < 1:
             raise ValueError('concurrency must be >= 1')
         self.db_name = db_name
+        self.embedder = embedder
         self.batch_size = batch_size
         self.concurrency = concurrency
 
@@ -94,50 +99,33 @@ class EmbeddingIndexerService:
                 pass
 
             try:
-                async with OllamaClient() as client:
-                    async def process(batch: list[dict]) -> None:
-                        nonlocal done
+                async def process(batch: list[dict]) -> None:
+                    nonlocal done
+                    if stop_event.is_set():
+                        return
+                    async with semaphore:
                         if stop_event.is_set():
                             return
-                        async with semaphore:
-                            if stop_event.is_set():
-                                return
-                            chunks_per_row = [
-                                _chunk_text(self._build_text(row)) for row in batch
-                            ]
-                            flat_texts = [c for chunks in chunks_per_row for c in chunks]
-                            try:
-                                flat_vectors = await client.embed_batch(flat_texts)
-                            except Exception as err:
-                                logger.warning(
-                                    'Embedding batch failed (rows=%d, chunks=%d, app_ids=%s, '
-                                    'chunk_lens=%s): %s; falling back to per-item',
-                                    len(batch),
-                                    len(flat_texts),
-                                    [row['app_id'] for row in batch],
-                                    [len(t) for t in flat_texts],
-                                    _format_ollama_error(err),
-                                )
-                                ids, vectors = await self._embed_individually(
-                                    client, batch, chunks_per_row
-                                )
-                            else:
-                                ids = [row['app_id'] for row in batch]
-                                vectors = []
-                                offset = 0
-                                for chunks in chunks_per_row:
-                                    n = len(chunks)
-                                    vectors.append(
-                                        _average_unit(flat_vectors[offset : offset + n])
-                                    )
-                                    offset += n
-                        async with write_lock:
-                            if ids:
-                                await asyncio.to_thread(collection.add, ids=ids, embeddings=vectors)
-                            done += len(batch)
-                            logger.info('Indexed %d/%d', done, total)
+                        chunks_per_row = [
+                            _chunk_text(self._build_text(row)) for row in batch
+                        ]
+                        flat_texts = [c for chunks in chunks_per_row for c in chunks]
+                        flat_vectors = await self.embedder.embed_passages(
+                            flat_texts, batch_size=self.batch_size
+                        )
+                        ids = [row['app_id'] for row in batch]
+                        vectors: list[list[float]] = []
+                        offset = 0
+                        for chunks in chunks_per_row:
+                            n = len(chunks)
+                            vectors.append(_average_unit(flat_vectors[offset : offset + n]))
+                            offset += n
+                    async with write_lock:
+                        await asyncio.to_thread(collection.add, ids=ids, embeddings=vectors)
+                        done += len(batch)
+                        logger.info('Indexed %d/%d', done, total)
 
-                    await asyncio.gather(*(process(b) for b in batches))
+                await asyncio.gather(*(process(b) for b in batches))
             finally:
                 if sigint_installed:
                     loop.remove_signal_handler(signal.SIGINT)
@@ -145,66 +133,6 @@ class EmbeddingIndexerService:
                     logger.info('Stopped early: %d/%d indexed; rerun to continue.', done, total)
         finally:
             await engine.dispose()
-
-    @classmethod
-    async def _embed_individually(
-        cls, client: OllamaClient, batch: list[dict], chunks_per_row: list[list[str]]
-    ) -> tuple[list[str], list[list[float]]]:
-        """Retry a failed batch row-by-row; per row embed each chunk and mean-pool."""
-        ids: list[str] = []
-        vectors: list[list[float]] = []
-        for row, chunks in zip(batch, chunks_per_row, strict=True):
-            try:
-                piece_vectors = [
-                    await cls._embed_with_split(client, row['app_id'], chunk)
-                    for chunk in chunks
-                ]
-            except Exception:
-                logger.exception(
-                    'Embedding failed for app_id=%s (chunks=%d, total_len=%d)',
-                    row['app_id'],
-                    len(chunks),
-                    sum(len(c) for c in chunks),
-                )
-                continue
-            ids.append(row['app_id'])
-            vectors.append(_average_unit(piece_vectors))
-        return ids, vectors
-
-    @classmethod
-    async def _embed_with_split(
-        cls, client: OllamaClient, app_id: str, text_value: str
-    ) -> list[float]:
-        """Embed text; on failure, split in half at whitespace and average the halves.
-
-        Works around a bge-m3/Ollama numerical bug that returns NaN for certain
-        token sequences. Recursion guarantees every non-empty fragment of the
-        original text contributes to the final vector.
-        """
-        try:
-            return await client.embed(text_value)
-        except Exception as err:
-            logger.warning(
-                'Embed piece failed (app_id=%s, text_len=%d): %s',
-                app_id,
-                len(text_value),
-                _format_ollama_error(err),
-            )
-            if len(text_value) <= _MIN_CHUNK_CHARS:
-                raise
-        mid = len(text_value) // 2
-        cut = text_value.rfind(' ', 0, mid)
-        if cut <= 0:
-            cut = text_value.find(' ', mid)
-        if cut <= 0:
-            cut = mid
-        left = text_value[:cut].strip()
-        right = text_value[cut:].strip()
-        pieces = [p for p in (left, right) if p]
-        if not pieces:
-            raise RuntimeError('Cannot split text further')
-        vectors = [await cls._embed_with_split(client, app_id, p) for p in pieces]
-        return _average_unit(vectors)
 
     @staticmethod
     async def _load_pending(session_factory, indexed_ids: set[str]) -> list[dict]:
@@ -237,7 +165,7 @@ class EmbeddingIndexerService:
         """Assemble the text to embed from name, categories and description.
 
         Empty/whitespace-only fields are ignored. Falls back to app_id so the
-        input is never empty (Ollama returns NaN embeddings for blank input).
+        input is never empty.
         """
         name = _clean_text(row.get('name') or '')
         description = _clean_text(row.get('description') or '')[:_DESCRIPTION_CHAR_LIMIT]
@@ -299,14 +227,6 @@ def _find_cut(text_value: str, limit: int) -> int:
         if idx >= min_cut:
             return idx + len(sep)
     return limit
-
-
-def _format_ollama_error(err: BaseException) -> str:
-    """Render an Ollama error with status code and response body for logs."""
-    if isinstance(err, OllamaHTTPError):
-        body = (err.body or '').strip().replace('\n', ' ')
-        return f'HTTP {err.status_code} {err.endpoint} body={body[:500]!r}'
-    return f'{type(err).__name__}: {err}'
 
 
 def _load_indexed_ids(collection: Collection) -> set[str]:

@@ -9,18 +9,16 @@ from .exceptions import OllamaError, OllamaHTTPError
 
 
 class OllamaClient:
-    """Async client for the Ollama HTTP API: embeddings and generation."""
+    """Async client for the Ollama HTTP API: LLM generation."""
 
     def __init__(
         self,
         base_url: str | None = None,
         llm_model: str | None = None,
-        embedding_model: str | None = None,
         timeout: float | None = None,
     ):
         self._base_url = (base_url or config.OLLAMA_URL).rstrip('/')
         self._llm_model = llm_model or config.OLLAMA_LLM_MODEL
-        self._embedding_model = embedding_model or config.OLLAMA_EMBEDDING_MODEL
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
             timeout=timeout or config.OLLAMA_TIMEOUT,
@@ -40,22 +38,6 @@ class OllamaClient:
     async def aclose(self) -> None:
         """Release the underlying HTTP client."""
         await self._client.aclose()
-
-    async def embed(self, text: str) -> list[float]:
-        """Return the embedding vector for a single piece of text."""
-        vectors = await self.embed_batch([text])
-        return vectors[0]
-
-    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Return embeddings for a batch of texts in a single request."""
-        if not texts:
-            return []
-        payload = {'model': self._embedding_model, 'input': texts}
-        data = await self._post_json('/api/embed', payload)
-        embeddings = data.get('embeddings')
-        if not isinstance(embeddings, list) or len(embeddings) != len(texts):
-            raise OllamaError(f'Unexpected embeddings response: {data!r}')
-        return embeddings
 
     async def generate(
         self,

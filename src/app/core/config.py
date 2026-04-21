@@ -10,6 +10,7 @@ class Config:
     CATEGORIES_DIR: Path = DATA_DIR / 'categories'
     DATABASES_DIR: Path = DATA_DIR / 'databases'
     CHROMA_DIR: Path = DATA_DIR / 'chroma'
+    CACHE_DIR: Path = BASE_DIR / 'cache_dir'
 
     CATEGORIES_TIMESTAMP_FORMAT: str = '%d_%m_%Y_%H_%M_%S'
 
@@ -43,9 +44,10 @@ class Config:
 
     OLLAMA_URL: str = os.getenv('OLLAMA_URL', 'http://localhost:11434')
     OLLAMA_LLM_MODEL: str = os.getenv('OLLAMA_LLM_MODEL', 'gemma4:e2b')
-    OLLAMA_EMBEDDING_MODEL: str = os.getenv('OLLAMA_EMBEDDING_MODEL', 'bge-m3')
     OLLAMA_TIMEOUT: float = float(os.getenv('OLLAMA_TIMEOUT', '120'))
 
+    EMBEDDING_MODEL: str = os.getenv('EMBEDDING_MODEL', 'intfloat/multilingual-e5-large')
+    EMBEDDING_DEVICE: str = os.getenv('EMBEDDING_DEVICE', 'cuda')
     EMBEDDING_DIM: int = int(os.getenv('EMBEDDING_DIM', '1024'))
     RAG_TOP_K: int = int(os.getenv('RAG_TOP_K', '20'))
     RAG_CANDIDATE_K: int = int(os.getenv('RAG_CANDIDATE_K', '500'))

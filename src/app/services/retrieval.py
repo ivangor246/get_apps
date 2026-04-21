@@ -7,7 +7,7 @@ from chromadb.api.models.Collection import Collection
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core import OllamaClient, config
+from app.core import TextEmbedder, config
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +43,17 @@ class RetrievalService:
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession],
-        client: OllamaClient,
+        embedder: TextEmbedder,
         collection: Collection,
     ) -> None:
         self._session_factory = session_factory
-        self._client = client
+        self._embedder = embedder
         self._collection = collection
 
     async def search(self, query_text: str, filters: FilterSpec, top_k: int | None = None) -> list[RetrievedApp]:
         """Embed the query, run oversampled kNN in Chroma, filter via SQL, return top_k."""
         top_k = top_k or config.RAG_TOP_K
-        query_vector = await self._client.embed(query_text)
+        query_vector = await self._embedder.embed_query(query_text)
 
         knn = await asyncio.to_thread(
             self._collection.query,

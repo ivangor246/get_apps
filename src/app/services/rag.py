@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from chromadb.api.models.Collection import Collection
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core import OllamaClient
+from app.core import OllamaClient, TextEmbedder
 
 from .retrieval import FilterSpec, RetrievalService, RetrievedApp
 
@@ -46,10 +46,11 @@ class RAGService:
         self,
         session_factory: async_sessionmaker[AsyncSession],
         client: OllamaClient,
+        embedder: TextEmbedder,
         collection: Collection,
     ) -> None:
         self._client = client
-        self._retrieval = RetrievalService(session_factory, client, collection)
+        self._retrieval = RetrievalService(session_factory, embedder, collection)
 
     async def answer(self, query: str, top_k: int | None = None) -> RAGResponse:
         """Run the full RAG pipeline for a user query."""
