@@ -3,6 +3,10 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urljoin
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 class Config:
     BASE_DIR: Path = Path(__file__).parent.parent.parent.parent
