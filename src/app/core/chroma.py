@@ -1,12 +1,13 @@
 import logging
+
 import chromadb
 from chromadb.api import ClientAPI
 from chromadb.api.models.Collection import Collection
 from chromadb.config import Settings
 
-logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
-
 from .config import config
+
+logging.getLogger('chromadb.telemetry.product.posthog').setLevel(logging.CRITICAL)
 
 _COLLECTION_NAME = 'apps'
 

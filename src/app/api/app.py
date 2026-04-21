@@ -22,8 +22,6 @@ def create_app(db_name: str) -> FastAPI:
         collection = get_app_collection(chroma_client)
         client = OllamaClient()
         app.state.rag_service = RAGService(session_factory, client, collection)
-        app.state.ollama_client = client
-        app.state.engine = engine
         try:
             yield
         finally:

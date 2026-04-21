@@ -137,8 +137,17 @@ def _extract_ratings_reviews(soup: BeautifulSoup) -> tuple[int | None, int | Non
                     reviews_count = _parse_count(part)
                 elif 'оценок' in part and ratings_count is None:
                     ratings_count = _parse_count(part)
-        elif 'оценок' in text and ratings_count is None and 'млн оценок' in text or ('тыс оценок' in text) or (
-            re.search(r'\d\s*оценок', text) and 'оценок' == text.split()[-1].replace(',', '')
+        elif (
+            'оценок' in text
+            and ratings_count is None
+            and (
+                'млн оценок' in text
+                or 'тыс оценок' in text
+                or (
+                    re.search(r'\d\s*оценок', text)
+                    and text.split()[-1].replace(',', '') == 'оценок'
+                )
+            )
         ):
             ratings_count = _parse_count(text)
 
