@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.core import OllamaClient, TextEmbedder
 from app.core.chroma import build_chroma_client, get_app_collection
 from app.core.db import build_engine, build_sessionmaker, init_db
+from app.core.jobs import JobManager
 from app.services import RAGService
 
 from .routes import router
@@ -23,6 +24,7 @@ def create_app(db_name: str) -> FastAPI:
         client = OllamaClient()
         embedder = TextEmbedder()
         app.state.rag_service = RAGService(session_factory, client, embedder, collection)
+        app.state.jobs = JobManager()
         try:
             yield
         finally:
