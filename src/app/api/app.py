@@ -3,9 +3,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core import OllamaClient, TextEmbedder
 from app.core.chroma import build_chroma_client, get_app_collection
+from app.core.config import get_config
 from app.core.db import build_engine, build_sessionmaker, init_db
 from app.core.jobs import JobManager
 from app.services import RAGService
@@ -58,4 +60,9 @@ def create_app() -> FastAPI:
         allow_headers=['*'],
     )
     app.include_router(router)
+
+    frontend_dist = get_config().BASE_DIR / 'front' / 'dist'
+    if frontend_dist.is_dir():
+        app.mount('/', StaticFiles(directory=frontend_dist, html=True), name='frontend')
+
     return app

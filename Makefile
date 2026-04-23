@@ -1,27 +1,36 @@
-DB ?=
-FOLDER ?=
-CONCURRENCY ?=
-BATCH_SIZE ?=
-HOST ?=
-PORT ?=
+.PHONY: install install-backend install-frontend \
+        dev dev-backend dev-frontend \
+        build build-frontend start clean
 
-.PHONY: install collect-categories collect-apps index serve
+install: install-backend install-frontend
 
-install:
+install-backend:
 	poetry install
 	poetry run playwright install chromium
 
-collect-categories:
-	poetry run python -m app.main categories
+install-frontend:
+	npm --prefix front install
 
-collect-apps:
-	@test -n "$(DB)" || (echo "DB argument is required: make collect-apps DB=myname" && exit 1)
-	poetry run python -m app.main apps --db $(DB) $(if $(FOLDER),--folder $(FOLDER),) $(if $(CONCURRENCY),--concurrency $(CONCURRENCY),)
+dev-backend:
+	poetry run uvicorn app.api.app:create_app --factory --reload --host 127.0.0.1 --port 8000
 
-index:
-	@test -n "$(DB)" || (echo "DB argument is required: make index DB=myname" && exit 1)
-	poetry run python -m app.main index --db $(DB) $(if $(BATCH_SIZE),--batch-size $(BATCH_SIZE),) $(if $(CONCURRENCY),--concurrency $(CONCURRENCY),)
+dev-frontend:
+	npm --prefix front run dev
 
-serve:
-	@test -n "$(DB)" || (echo "DB argument is required: make serve DB=myname" && exit 1)
-	poetry run python -m app.main serve --db $(DB) $(if $(HOST),--host $(HOST),) $(if $(PORT),--port $(PORT),)
+dev:
+	@echo "Starting backend (:8000) and frontend (:5173); Ctrl+C stops both."
+	@trap 'kill 0' INT TERM; \
+	  $(MAKE) dev-backend & \
+	  $(MAKE) dev-frontend & \
+	  wait
+
+build: build-frontend
+
+build-frontend:
+	npm --prefix front run build
+
+start:
+	poetry run python -m app.main
+
+clean:
+	rm -rf front/dist front/node_modules/.vite
