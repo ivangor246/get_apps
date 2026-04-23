@@ -79,6 +79,7 @@ class CategoriesRunsResponse(BaseModel):
 class RAGQueryRequest(BaseModel):
     """Body for POST /rag/query."""
 
+    db_name: str = Field(..., min_length=1, description='SQLite DB / Chroma collection to query.')
     query: str = Field(..., min_length=1, description='Natural-language user query.')
     top_k: int | None = Field(default=None, ge=1, le=100, description='Override for top_k retrieved apps.')
 

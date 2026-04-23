@@ -68,7 +68,7 @@ async def list_databases() -> DatabasesResponse:
     """List SQLite databases under saved_data/databases/ (by stem name)."""
     cfg = get_config()
     cfg.DATABASES_DIR.mkdir(parents=True, exist_ok=True)
-    names = sorted(p.stem for p in cfg.DATABASES_DIR.glob('*.db'))
+    names = sorted(p.stem for p in cfg.DATABASES_DIR.glob('*.sqlite3'))
     return DatabasesResponse(databases=names)
 
 
@@ -152,8 +152,8 @@ async def cancel_task(request: Request, job_id: str) -> dict:
 
 @router.post('/rag/query', response_model=RAGQueryResponse)
 async def rag_query(request: Request, body: RAGQueryRequest) -> RAGQueryResponse:
-    """Run the RAG pipeline for the given natural-language query."""
-    service: RAGService = request.app.state.rag_service
+    """Run the RAG pipeline against the selected DB."""
+    service: RAGService = await request.app.state.get_rag_service(body.db_name)
     response = await service.answer(body.query, top_k=body.top_k)
     return RAGQueryResponse(
         answer=response.answer,
