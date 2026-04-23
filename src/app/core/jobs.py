@@ -1,9 +1,11 @@
 import asyncio
 import json
+import logging
 import time
 import uuid
 from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -79,6 +81,36 @@ class JobHandle:
 JobCoroFactory = Callable[[JobHandle], Awaitable[Any]]
 
 
+class _HandleLogBridge(logging.Handler):
+    """Forward logging records from `app.*` loggers to a JobHandle."""
+
+    def __init__(self, handle: 'JobHandle') -> None:
+        super().__init__(level=logging.INFO)
+        self._handle = handle
+        self.setFormatter(logging.Formatter('%(levelname)s %(name)s — %(message)s'))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self._handle.log(self.format(record))
+        except Exception:  # noqa: BLE001
+            pass
+
+
+@contextmanager
+def _capture_app_logs(handle: 'JobHandle'):
+    root = logging.getLogger('app')
+    bridge = _HandleLogBridge(handle)
+    prev_level = root.level
+    if prev_level == logging.NOTSET or prev_level > logging.INFO:
+        root.setLevel(logging.INFO)
+    root.addHandler(bridge)
+    try:
+        yield
+    finally:
+        root.removeHandler(bridge)
+        root.setLevel(prev_level)
+
+
 class JobManager:
     """In-memory registry of async jobs with per-job log buffer and SSE subscribers."""
 
@@ -138,7 +170,8 @@ class JobManager:
         job.started_at = time.time()
         self._emit(job.id, JobEvent('status', job.snapshot()))
         try:
-            await coro_factory(handle)
+            with _capture_app_logs(handle):
+                await coro_factory(handle)
             job.status = 'done'
             self._emit(job.id, JobEvent('done', job.snapshot()))
         except asyncio.CancelledError:
