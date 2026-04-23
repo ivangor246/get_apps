@@ -1,26 +1,14 @@
 # get_apps
 
-Пайплайн для сбора и RAG-анализа приложений из RuStore.
+Пайплайн для сбора и RAG-анализа приложений из RuStore. Управление — через веб-интерфейс (React + MUI).
 
 ## Требования
 
 - **Python** 3.14+
 - **Poetry** 2.0+
-- **Ollama** (локально, для эмбеддингов и LLM) — [ollama.com](https://ollama.com)
+- **Node.js** 20+ / **npm**
+- **Ollama** (локально, для LLM) — [ollama.com](https://ollama.com)
 - **Chromium** — ставится автоматически через `playwright install`
-
-## Python-зависимости
-
-Из [pyproject.toml](pyproject.toml):
-
-- `beautifulsoup4`, `lxml` — парсинг HTML
-- `playwright` — headless-браузер для обхода анти-бота RuStore
-- `sqlalchemy[asyncio]`, `aiosqlite` — async ORM + SQLite-драйвер
-- `httpx` — HTTP-клиент для Ollama
-- `chromadb` — локальное persistent векторное хранилище (HNSW)
-- `fastapi`, `uvicorn[standard]` — REST API для RAG
-
-Dev: `ruff`.
 
 ## Установка
 
@@ -28,118 +16,60 @@ Dev: `ruff`.
 make install
 ```
 
-Выполняет `poetry install` и ставит Chromium для Playwright.
+Ставит python-зависимости, Chromium для Playwright и npm-пакеты фронтенда.
 
 ## Модели Ollama
 
-Перед индексацией и запуском API:
-
 ```bash
-ollama pull bge-m3
 ollama pull gemma4:e2b
 ollama serve   # если не запущен как сервис
 ```
 
-Имена моделей, URL Ollama и прочие настройки переопределяются переменными окружения
-(см. [src/app/core/config.py](src/app/core/config.py)): `OLLAMA_URL`, `OLLAMA_LLM_MODEL`,
-`OLLAMA_EMBEDDING_MODEL`, `EMBEDDING_DIM`, `RAG_TOP_K`, `RAG_CANDIDATE_K`,
-`API_HOST`, `API_PORT`, `OLLAMA_TIMEOUT`.
+Эмбеддинги считаются локально через `fastembed-gpu` (`intfloat/multilingual-e5-large`). Модель и URL Ollama меняются в UI на странице **Settings** — значения сохраняются в `saved_data/config.json`.
 
-## Команды
+## Запуск
 
-### Сбор app_id по категориям
+### Разработка (бэкенд + фронтенд с hot-reload)
 
 ```bash
-make collect-categories
+make dev
 ```
 
-Результат: `saved_data/categories/<timestamp>/<category>.txt` — по одному файлу на категорию, один `app_id` на строку.
+- Backend: http://127.0.0.1:8000
+- Frontend: http://localhost:5173
 
-### Сбор детальной информации о приложениях
+### Продакшен (единый порт)
 
 ```bash
-make collect-apps DB=<name> [FOLDER=<timestamp>] [CONCURRENCY=<N>]
+make build    # собрать фронт в front/dist/
+make start    # uvicorn отдаёт и API, и статику фронта на 127.0.0.1:8000
 ```
 
-- `DB` — имя SQLite-базы: сохранится в `saved_data/databases/<name>.sqlite3`.
-- `FOLDER` — подпапка в `saved_data/categories/` (по умолчанию берётся самая свежая).
-- `CONCURRENCY` — параллельные загрузки страниц (по умолчанию 3).
+## Веб-интерфейс
 
-### Индексация эмбеддингов
+- **Query** — RAG-запросы: выбор БД, естественно-языковой вопрос, ответ + применённые фильтры + source-apps.
+- **Collection** — (1) сбор `app_id` по категориям RuStore, (2) сбор детальной информации в SQLite.
+- **Indexing** — расчёт эмбеддингов по выбранной БД и запись в Chroma.
+- **Settings** — переключение темы (light/dark) + редактор runtime-конфига (Ollama, embedding, RAG, API).
 
-```bash
-make index DB=<name> [BATCH_SIZE=<N>]
-```
-
-Считает эмбеддинги `bge-m3` для каждого приложения без вектора и кладёт в Chroma-коллекцию `apps` в `saved_data/chroma/<name>/`. `BATCH_SIZE` по умолчанию 32.
-
-### Запуск RAG API
-
-```bash
-make serve DB=<name> [HOST=<host>] [PORT=<port>]
-```
-
-Поднимает FastAPI на `127.0.0.1:8000` (по умолчанию).
-
-**Эндпоинты:**
-
-- `GET /health` — проверка живости.
-- `POST /rag/query` — RAG-запрос.
-
-Пример запроса:
-
-```bash
-curl -X POST http://127.0.0.1:8000/rag/query \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"найди лучшие идеи приложений из приложений, у которых количество скачиваний выше чем медианное по базе, которые можно реализовать без сервера"}'
-```
-
-Ответ:
-
-```json
-{
-  "answer": "...",
-  "filters": { "above_median_downloads": true, "min_rating": null, "...": "..." },
-  "sources": [ { "app_id": "...", "name": "...", "url": "...", "rating": 4.5, "downloads": 1000000, "categories": [...], "distance": 0.21 } ]
-}
-```
-
-## Полный цикл
-
-```bash
-make install
-ollama pull bge-m3 && ollama pull gemma4:e2b
-
-make collect-categories
-make collect-apps DB=rustore
-make index DB=rustore
-make serve DB=rustore
-```
-
-## CLI напрямую
-
-Если удобнее без make:
-
-```bash
-poetry run python -m app.main categories
-poetry run python -m app.main apps   --db <name> [--folder <ts>] [--concurrency 3]
-poetry run python -m app.main index  --db <name> [--batch-size 32]
-poetry run python -m app.main serve  --db <name> [--host 127.0.0.1] [--port 8000]
-```
+Все длительные задачи показывают живой прогресс и логи через SSE.
 
 ## Структура
 
 ```
 src/app/
-├── main.py                 # CLI
-├── api/                    # FastAPI (create_app, routes, schemas)
-├── core/                   # config, db, ollama, chroma
-├── models/                 # ORM (AppInfo)
-├── services/               # парсеры, сбор, индексация, retrieval, RAG
-└── tasks/                  # точки входа CLI для каждой команды
+├── main.py           # uvicorn entrypoint
+├── api/              # FastAPI (create_app, routes, schemas)
+├── core/             # config, jobs (SSE), db, ollama, chroma, embedder
+├── models/           # ORM (AppInfo)
+├── services/         # парсеры, сбор, индексация, retrieval, RAG
+└── tasks/            # корутины-обёртки для фоновых задач
+
+front/src/            # FSD: app / pages / widgets / features / entities / shared
 
 saved_data/
 ├── categories/<timestamp>/<category>.txt
 ├── databases/<name>.sqlite3
-└── chroma/<name>/          # persistent Chroma-хранилище эмбеддингов
+├── chroma/<name>/
+└── config.json       # пользовательские оверрайды конфига
 ```

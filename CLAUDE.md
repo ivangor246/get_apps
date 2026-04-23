@@ -2,50 +2,86 @@
 
 ## About
 
-A pipeline tool for collecting and processing app data from app stores.
+Full-stack tool for collecting and analyzing app data from the RuStore catalogue, driven entirely through a web UI.
 
-**Two core concerns:**
-1. **Collection** — crawl store catalogues by category, extract app identifiers, persist raw results.
-2. **Processing** — analyze and transform the collected data (reporting, filtering, enrichment, etc.)
+**Three core concerns:**
+1. **Collection** — crawl the store by category, fetch per-app metadata, persist to SQLite.
+2. **Indexing** — embed app descriptions into a Chroma vector store.
+3. **RAG** — natural-language queries against the indexed data (retrieval + filter extraction + LLM answer).
 
-These concerns are intentionally decoupled: collection produces raw output files; processing reads them independently.
+All three are exposed as HTTP endpoints; there is no CLI. Long-running work runs as background jobs with live progress streamed over Server-Sent Events.
 
 ## Tech Stack
 
+**Backend**
 - **Python 3.14+**, async throughout (`asyncio`)
-- **Playwright** — headless browser automation (anti-bot bypass, JS rendering)
+- **FastAPI + uvicorn** — sole entry point
+- **Playwright** — headless browser for RuStore scraping
 - **BeautifulSoup + lxml** — HTML parsing
+- **SQLAlchemy (async) + aiosqlite** — ORM over SQLite
+- **ChromaDB** — local persistent vector store
+- **fastembed-gpu** — ONNX embeddings (`intfloat/multilingual-e5-large` by default)
+- **Ollama** — LLM calls (via `httpx`)
 - **Poetry** — dependency management
-- **Ruff** — linting and formatting
+- **Ruff** — linting/formatting
+
+**Frontend**
+- **React 19 + TypeScript + Vite**
+- **Material UI** (`@mui/material`) — Material Design components
+- **React Router**, **@tanstack/react-query**
+- **Feature-Sliced Design** layout
 
 ## Folder Structure
 
 ```
 src/app/
-├── main.py           # Entry point
-├── core/             # Config, custom exceptions, etc.
-├── tasks/            # High-level orchestration per store
-└── services/
-    ├── *.py          # Service classes (one per store)
-    └── parsers/      # Low-level HTML parsers (one per store)
-    ...               # Other layers as needed
+├── main.py           # Thin uvicorn entrypoint
+├── api/              # FastAPI app factory, routes, pydantic schemas
+├── core/             # config, jobs (SSE), db, chroma, ollama, embedder
+├── tasks/            # Async coroutines wrapping each collection / index run
+├── services/         # Domain services (Rustore*, RAG, Retrieval, EmbeddingIndexer)
+│   └── parsers/      # Playwright + BeautifulSoup page parsers
+└── models/           # SQLAlchemy ORM models
+
+front/src/            # Feature-Sliced Design:
+├── app/              # App component + providers (theme, query client, router)
+├── pages/            # home, collection, indexing, settings
+├── widgets/          # app-header, db-selector, job-log-viewer
+├── features/         # toggle-theme, edit-config, run-*, submit-rag-query
+├── entities/         # config, database, job, rag-result
+└── shared/           # api client, SSE helper, theme, config
 
 saved_data/
-└── categories/
-    └── {timestamp}/  # One directory per run
-        └── *.txt     # One file per category
-    ...               # Other data as needed
+├── categories/{timestamp}/*.txt      # raw app IDs per category per run
+├── databases/{name}.sqlite3          # collected app metadata, one DB per run set
+├── chroma/{name}/                    # persistent vector index, one dir per DB
+└── config.json                       # user overrides of runtime config
 ```
 
 ## Architecture
 
-The system is split into three layers:
+**Backend layers:**
+1. **API** (`api/`) — thin routes + pydantic schemas. Long-running work is dispatched to the job manager.
+2. **Core** (`core/`) — config, job manager, shared clients (Ollama, embedder, Chroma, DB).
+3. **Services** (`services/`) — domain logic: scraping, indexing, retrieval, RAG orchestration.
+4. **Tasks** (`tasks/`) — async coroutines wiring services together for one run of a pipeline.
 
-1. **Tasks** — entry points per store; wired in `main.py`. Each task runs an independent collection pipeline.
-2. **Services** — orchestrate a full collection run: browser lifecycle, pagination, concurrency, output writing.
-3. **Parsers** — fetch a single page via Playwright, extract app identifiers with BeautifulSoup.
+**Frontend (FSD):** strict unidirectional imports — `app → pages → widgets → features → entities → shared`. Cross-imports within the same slice go through the public `index.ts`.
 
-**Adding a new store** = add a parser, a service, and a task. No changes to existing code.
+**Adding a new store** = new parser + new service + new task + new endpoint + new feature/page on the frontend.
+
+## Configuration
+
+**No `.env` files.** Hardcoded defaults live in [src/app/core/config.py](src/app/core/config.py); user overrides persist to `saved_data/config.json` and are edited from the Settings page.
+
+- Tunable (settable from UI): Ollama URL/model/timeout, embedding model/device/dim/batch/VRAM cap, RAG top_k/candidate_k, API host/port.
+- Not tunable (code-only): file paths, RuStore URLs + category list, pagination count.
+
+Overrides apply immediately for values looked up per-request. Values consumed at startup (embedder model, Ollama client base URL) require a backend restart to take effect.
+
+## Background Jobs & SSE
+
+Long-running endpoints (`POST /tasks/collect-categories`, `/tasks/collect-apps`, `/tasks/index`) return a `job_id` immediately. The client subscribes to `GET /tasks/{job_id}/events` (SSE) for live `log` / `progress` / `status` / `done` / `error` frames. Service-layer `logging.getLogger('app')` records are auto-forwarded to the job stream — services emit regular log calls, no job-aware plumbing required.
 
 ---
 
@@ -65,10 +101,11 @@ Before implementing:
 
 Write professional, idiomatic code consistent with the language and ecosystem.
 
-- Follow language-standard conventions (PEP 8, Effective Go, Airbnb JS, etc.).
-- Use clear, descriptive names for variables, functions, and classes.
+- Follow language-standard conventions (PEP 8, Airbnb JS, etc.).
+- Use clear, descriptive names.
 - Prefer explicit over implicit.
 - Consistency with existing code overrides personal preference.
+- Frontend: respect FSD import direction. Keep UI in `ui/`, data hooks in `model/`, public exports in `index.ts`.
 
 ---
 
@@ -158,7 +195,7 @@ feat: add JWT refresh token rotation
 
 ## Security & Safety
 
-- Never hard-code secrets, API keys, or credentials — use environment variables.
+- Never hard-code secrets, API keys, or credentials — use environment variables or the runtime config store, not literals.
 - Validate and sanitize all external input (user, API, file).
 - Prefer well-maintained libraries over custom crypto or auth implementations.
 - Flag security concerns explicitly rather than silently working around them.
