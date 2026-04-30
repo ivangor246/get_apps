@@ -5,6 +5,7 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import { NavLink } from 'react-router-dom';
 import { ToggleThemeButton } from '../../../features/toggle-theme';
+import { StatusIndicator } from './StatusIndicator';
 
 const links: Array<{ to: string; label: string }> = [
   { to: '/', label: 'Query' },
@@ -39,6 +40,7 @@ export function AppHeader() {
             </Button>
           ))}
         </Box>
+        <StatusIndicator />
         <ToggleThemeButton />
       </Toolbar>
     </AppBar>
