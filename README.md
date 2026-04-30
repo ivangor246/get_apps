@@ -21,7 +21,7 @@ make install
 ## Модели Ollama
 
 ```bash
-ollama pull gemma4:e2b
+ollama pull gemma3:1b
 ollama serve   # если не запущен как сервис
 ```
 

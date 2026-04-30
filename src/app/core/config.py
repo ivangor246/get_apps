@@ -49,7 +49,7 @@ class Config:
     """User-tunable runtime settings; defaults live here, overrides persist in saved_data/config.json."""
 
     OLLAMA_URL: str = 'http://localhost:11434'
-    OLLAMA_LLM_MODEL: str = 'gemma4:e2b'
+    OLLAMA_LLM_MODEL: str = 'gemma3:1b'
     OLLAMA_TIMEOUT: float = 120.0
 
     EMBEDDING_MODEL: str = 'intfloat/multilingual-e5-large'
@@ -94,7 +94,7 @@ class SettingsStore:
             return {}
         try:
             raw = json.loads(self.path.read_text(encoding='utf-8'))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return {}
         return {k: v for k, v in raw.items() if k in _TUNABLE_FIELDS}
 
