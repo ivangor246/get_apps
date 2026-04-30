@@ -52,7 +52,7 @@ class RetrievalService:
         self._collection = collection
 
     async def search(self, query_text: str, filters: FilterSpec, top_k: int | None = None) -> list[RetrievedApp]:
-        """Embed the query, run oversampled kNN in Chroma, filter via SQL, return top_k."""
+        """Embed the query, run oversampled kNN in Chroma, filter via SQL with relax-fallback, return top_k."""
         top_k = top_k or config.RAG_TOP_K
         query_vector = await self._embedder.embed_query(query_text)
 
@@ -68,12 +68,46 @@ class RetrievalService:
         distance_map = dict(zip(candidate_ids, distances, strict=True))
 
         async with self._session_factory() as session:
-            median = await self._median_downloads(session) if filters.above_median_downloads else None
-            rows = await self._filter_candidates(session, candidate_ids, filters, median)
+            for attempt_filters, label in self._relaxation_chain(filters):
+                median = await self._median_downloads(session) if attempt_filters.above_median_downloads else None
+                rows = await self._filter_candidates(session, candidate_ids, attempt_filters, median)
+                if rows:
+                    if label != 'original':
+                        logger.info('retrieval relaxed: %s (matched %d rows)', label, len(rows))
+                    results = [
+                        self._row_to_app(row, distance_map[row['app_id']])
+                        for row in rows
+                        if row['app_id'] in distance_map
+                    ]
+                    results.sort(key=lambda app: app.distance)
+                    return results[:top_k]
+                logger.info('retrieval empty at stage: %s', label)
+        return []
 
-        results = [self._row_to_app(row, distance_map[row['app_id']]) for row in rows if row['app_id'] in distance_map]
-        results.sort(key=lambda app: app.distance)
-        return results[:top_k]
+    @staticmethod
+    def _relaxation_chain(filters: FilterSpec) -> list[tuple[FilterSpec, str]]:
+        """Yield progressively relaxed FilterSpecs to retry on empty results."""
+        chain: list[tuple[FilterSpec, str]] = [(filters, 'original')]
+        has_categories = bool(filters.categories_any) or filters.above_median_downloads
+        if has_categories:
+            chain.append((
+                FilterSpec(
+                    min_downloads=filters.min_downloads,
+                    max_downloads=filters.max_downloads,
+                    min_rating=filters.min_rating,
+                    requested_count=filters.requested_count,
+                ),
+                'dropped categories and above_median',
+            ))
+        has_any_structural = (
+            filters.min_downloads is not None
+            or filters.max_downloads is not None
+            or filters.min_rating is not None
+            or has_categories
+        )
+        if has_any_structural:
+            chain.append((FilterSpec(requested_count=filters.requested_count), 'semantic-only'))
+        return chain
 
     @staticmethod
     async def _filter_candidates(
