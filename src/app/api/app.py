@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +10,7 @@ from app.core.chroma import build_chroma_client, get_app_collection
 from app.core.config import get_config
 from app.core.db import build_engine, build_sessionmaker, init_db
 from app.core.jobs import JobManager
+from app.core.ollama_runtime import OllamaRuntime
 from app.services import RAGService
 
 from .routes import router
@@ -21,6 +22,8 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         client = OllamaClient()
+        ollama_runtime = OllamaRuntime(client)
+        startup_task = asyncio.create_task(ollama_runtime.start())
         embedder = TextEmbedder()
         rag_cache: dict[str, RAGService] = {}
         engines: dict[str, object] = {}
@@ -43,11 +46,16 @@ def create_app() -> FastAPI:
 
         app.state.jobs = JobManager()
         app.state.ollama = client
+        app.state.ollama_runtime = ollama_runtime
         app.state.embedder = embedder
         app.state.get_rag_service = get_rag_service
         try:
             yield
         finally:
+            startup_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await startup_task
+            await ollama_runtime.stop()
             await client.aclose()
             for engine in engines.values():
                 await engine.dispose()

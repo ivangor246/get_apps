@@ -35,6 +35,21 @@ class AppConfigPatch(BaseModel):
     API_PORT: int | None = None
 
 
+class OllamaStatusSchema(BaseModel):
+    """Current state of the Ollama bring-up pipeline."""
+
+    status: str
+    detail: str | None = None
+    model: str | None = None
+
+
+class SystemStatusSchema(BaseModel):
+    """Aggregated startup status for the backend and Ollama."""
+
+    backend: str
+    ollama: OllamaStatusSchema
+
+
 class CollectCategoriesRequest(BaseModel):
     concurrency: int = Field(default=3, ge=1, le=16)
 
