@@ -127,3 +127,6 @@ class RAGQueryResponse(BaseModel):
     answer: str
     filters: AppliedFilters
     sources: list[SourceApp]
+    intent: str
+    language: str
+    iterations: int

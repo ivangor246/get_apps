@@ -88,6 +88,13 @@ export function HomePage() {
           </Typography>
           <Typography sx={{ whiteSpace: 'pre-wrap', mb: 3 }}>{rag.data.answer}</Typography>
 
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1, mb: 1 }}>
+            <Chip label={`intent: ${rag.data.intent}`} size="small" variant="outlined" />
+            {rag.data.language ? (
+              <Chip label={`lang: ${rag.data.language}`} size="small" variant="outlined" />
+            ) : null}
+            <Chip label={`iterations: ${rag.data.iterations}`} size="small" variant="outlined" />
+          </Stack>
           <FiltersChips filters={rag.data.filters} />
 
           <Divider sx={{ my: 2 }} />

@@ -20,6 +20,9 @@ export interface RAGResponse {
   answer: string;
   filters: AppliedFilters;
   sources: SourceApp[];
+  intent: string;
+  language: string;
+  iterations: number;
 }
 
 export interface RAGQueryPayload {

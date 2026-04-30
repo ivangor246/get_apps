@@ -186,4 +186,7 @@ async def rag_query(request: Request, body: RAGQueryRequest) -> RAGQueryResponse
             )
             for src in response.sources
         ],
+        intent=response.intent,
+        language=response.language,
+        iterations=response.iterations,
     )

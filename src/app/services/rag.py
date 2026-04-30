@@ -130,11 +130,14 @@ class CritiqueDecision:
 
 @dataclass
 class RAGResponse:
-    """Final answer from the RAG pipeline with the sources used."""
+    """Final answer from the RAG pipeline with the sources used and pipeline metadata."""
 
     answer: str
     filters: FilterSpec
     sources: list[RetrievedApp]
+    intent: str
+    language: str
+    iterations: int
 
 
 class RAGService:
@@ -165,16 +168,26 @@ class RAGService:
                 answer=analysis.smalltalk_reply,
                 filters=analysis.filters,
                 sources=[],
+                intent=analysis.intent,
+                language=analysis.language,
+                iterations=1,
             )
 
         effective_top_k = top_k or analysis.filters.requested_count
         search_query = analysis.search_query or query
         sources = await self._retrieval.search(search_query, analysis.filters, top_k=effective_top_k)
-        sources = await self._refine_via_critique(
+        sources, iterations = await self._refine_via_critique(
             query, analysis.language, analysis.filters, search_query, sources, effective_top_k,
         )
         answer_text = await self._generate_answer(query, analysis.language, sources)
-        return RAGResponse(answer=answer_text, filters=analysis.filters, sources=sources)
+        return RAGResponse(
+            answer=answer_text,
+            filters=analysis.filters,
+            sources=sources,
+            intent=analysis.intent,
+            language=analysis.language,
+            iterations=iterations,
+        )
 
     async def _refine_via_critique(
         self,
@@ -184,8 +197,8 @@ class RAGService:
         search_query: str,
         sources: list[RetrievedApp],
         top_k: int | None,
-    ) -> list[RetrievedApp]:
-        """Apply at most one critique pass + one retrieval retry; return the surviving sources."""
+    ) -> tuple[list[RetrievedApp], int]:
+        """Apply at most one critique pass + one retrieval retry; return surviving sources and retrieval iteration count."""
         decision = await self._critique(query, language, sources)
         logger.info(
             'critique 1: kept %d/%d revised=%r',
@@ -194,11 +207,11 @@ class RAGService:
             (decision.revised_search_query or '')[:120],
         )
         if decision.keep_indices:
-            return [sources[i - 1] for i in decision.keep_indices]
+            return [sources[i - 1] for i in decision.keep_indices], 1
         if not sources:
-            return sources
+            return sources, 1
         if not decision.revised_search_query or decision.revised_search_query == search_query:
-            return sources
+            return sources, 1
         retry_sources = await self._retrieval.search(decision.revised_search_query, filters, top_k=top_k)
         retry_decision = await self._critique(query, language, retry_sources)
         logger.info(
@@ -207,8 +220,8 @@ class RAGService:
             len(retry_sources),
         )
         if retry_decision.keep_indices:
-            return [retry_sources[i - 1] for i in retry_decision.keep_indices]
-        return retry_sources
+            return [retry_sources[i - 1] for i in retry_decision.keep_indices], 2
+        return retry_sources, 2
 
     async def _analyze(self, query: str) -> QueryAnalysis:
         """Single LLM call producing intent, language, HyDE search query, filters, and an optional smalltalk reply."""
