@@ -13,14 +13,12 @@ interface Props {
 export function SubmitRagQueryForm({ loading, onSubmit }: Props) {
   const [dbName, setDbName] = useState('');
   const [query, setQuery] = useState('');
-  const [topK, setTopK] = useState(20);
 
   const handle = (e: FormEvent) => {
     e.preventDefault();
     onSubmit({
       db_name: dbName.trim(),
       query: query.trim(),
-      top_k: topK,
     });
   };
 
@@ -37,22 +35,14 @@ export function SubmitRagQueryForm({ loading, onSubmit }: Props) {
         placeholder="E.g. Find popular photo editors with rating above 4.5"
       />
 
-      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-        <TextField
-          type="number"
-          label="Top K"
-          value={topK}
-          onChange={(e) => setTopK(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
-          sx={{ width: 140 }}
-        />
-        <Button
-          type="submit"
-          variant="contained"
-          disabled={loading || dbName.trim() === '' || query.trim() === ''}
-        >
-          {loading ? 'Running…' : 'Ask'}
-        </Button>
-      </Stack>
+      <Button
+        type="submit"
+        variant="contained"
+        disabled={loading || dbName.trim() === '' || query.trim() === ''}
+        sx={{ alignSelf: 'flex-start' }}
+      >
+        {loading ? 'Running…' : 'Ask'}
+      </Button>
     </Stack>
   );
 }
