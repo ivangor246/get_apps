@@ -66,7 +66,7 @@ class OllamaClient:
         try:
             response = await self._client.post(endpoint, json=payload)
         except httpx.HTTPError as err:
-            raise OllamaError(f'Ollama request failed: {err}') from err
+            raise OllamaError(f'Ollama request failed: {type(err).__name__}: {err}') from err
         if response.status_code >= 400:
             raise OllamaHTTPError(response.status_code, endpoint, response.text)
         return response.json()
