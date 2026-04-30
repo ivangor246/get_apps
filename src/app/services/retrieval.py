@@ -21,6 +21,7 @@ class FilterSpec:
     min_rating: float | None = None
     categories_any: list[str] = field(default_factory=list)
     above_median_downloads: bool = False
+    requested_count: int | None = None
 
 
 @dataclass

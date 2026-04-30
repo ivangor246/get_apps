@@ -1,33 +1,65 @@
 import json
 import logging
+import re
 from dataclasses import dataclass
 
 from chromadb.api.models.Collection import Collection
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core import OllamaClient, TextEmbedder
+from app.core.config import config
 
 from .retrieval import FilterSpec, RetrievalService, RetrievedApp
 
 logger = logging.getLogger(__name__)
 
+_VALID_CATEGORIES: frozenset[str] = frozenset(config.RUSTORE_CATEGORIES)
+_CYRILLIC_RE = re.compile(r'[а-яА-ЯёЁ]')
+
 _FILTER_SYSTEM_PROMPT = (
-    'Ты извлекаешь структурные фильтры из пользовательского запроса о приложениях. '
-    'Верни строго JSON-объект со следующими ключами (любой из них можно опустить или оставить null):\n'
-    '- min_downloads (целое): минимальное количество скачиваний\n'
-    '- max_downloads (целое): максимальное количество скачиваний\n'
-    '- min_rating (число от 0 до 5): минимальный рейтинг\n'
-    '- categories_any (массив строк): названия категорий, если пользователь их перечислил\n'
-    '- above_median_downloads (bool): true, если пользователь просит приложения с количеством '
-    'скачиваний выше медианного по базе\n'
-    'Никакого текста вне JSON. Если фильтр не упомянут — не включай его в ответ.'
+    'You extract structural filters from a user query about mobile apps. '
+    'Return ONLY a single JSON object — no prose, no markdown.\n'
+    '\n'
+    'CRITICAL RULE: include a field ONLY if the user explicitly mentioned it '
+    '(named a number, a rating, a category, or used words like "popular" / "above median"). '
+    'For general queries (greetings, "suggest some apps", "give me ideas") return an empty object {}. '
+    'Never invent values. Never guess.\n'
+    '\n'
+    'Possible fields (all optional):\n'
+    '- min_downloads (int): explicit minimum downloads\n'
+    '- max_downloads (int): explicit maximum downloads\n'
+    '- min_rating (number 0..5): explicit minimum rating\n'
+    '- categories_any (array of strings): categories — ONLY from the closed list below, lowercase\n'
+    '- above_median_downloads (bool): true ONLY if the user said "popular", "above median", '
+    '"trending", or similar\n'
+    '- requested_count (int 1..50): the number of apps the user explicitly asked for '
+    '(e.g. "suggest 3 ideas", "list 5 apps")\n'
+    '\n'
+    f'Allowed categories_any values (use ONLY these): {", ".join(config.RUSTORE_CATEGORIES)}\n'
+    'Any other category — including movie genres (action, comedy, fantasy, etc.) — is forbidden. '
+    'If the user names a category that is not in the list, omit categories_any entirely.\n'
+    '\n'
+    'Examples:\n'
+    'Query: "Suggest 3 app ideas" -> {"requested_count": 3}\n'
+    'Query: "Предложи 3 идеи приложений" -> {"requested_count": 3}\n'
+    'Query: "Suggest some apps" -> {}\n'
+    'Query: "Hi" -> {}\n'
+    'Query: "Привет" -> {}\n'
+    'Query: "Финансовые приложения с рейтингом 4+" -> '
+    '{"categories_any": ["finance"], "min_rating": 4}\n'
+    'Query: "Popular health apps" -> {"categories_any": ["health"], "above_median_downloads": true}\n'
+    'Query: "Apps with more than 100000 downloads" -> {"min_downloads": 100000}\n'
 )
 
 _ANSWER_SYSTEM_PROMPT = (
-    'Ты помогаешь искать идеи приложений по предоставленному каталогу. '
-    'Отвечай на русском, опирайся только на приложения из контекста, ссылайся на них номерами [N]. '
-    'Если в контексте нет подходящих примеров — скажи об этом прямо.'
+    'You help users find app ideas from the provided catalog. '
+    'Reply in the same language as the user query; if the language is unclear, reply in English. '
+    'Ground your answer ONLY in the apps listed in the context and reference them by their numbers [N]. '
+    'If the context is empty or has no relevant matches, say so plainly.'
 )
+
+_NO_MATCHES_EN = 'No apps in the catalog match the query under the applied filters.'
+_NO_MATCHES_RU = 'По базе не нашлось приложений, подходящих под запрос с учётом фильтров.'
 
 
 @dataclass
@@ -55,7 +87,8 @@ class RAGService:
     async def answer(self, query: str, top_k: int | None = None) -> RAGResponse:
         """Run the full RAG pipeline for a user query."""
         filters = await self._extract_filters(query)
-        sources = await self._retrieval.search(query, filters, top_k=top_k)
+        effective_top_k = top_k or filters.requested_count
+        sources = await self._retrieval.search(query, filters, top_k=effective_top_k)
         answer_text = await self._generate_answer(query, sources)
         return RAGResponse(answer=answer_text, filters=filters, sources=sources)
 
@@ -81,7 +114,7 @@ class RAGService:
 
     @staticmethod
     def _coerce_filter(data: dict) -> FilterSpec:
-        """Coerce the parsed JSON into a FilterSpec, ignoring malformed fields."""
+        """Coerce the parsed JSON into a FilterSpec, ignoring malformed or hallucinated fields."""
         spec = FilterSpec()
         min_downloads = data.get('min_downloads')
         if isinstance(min_downloads, (int, float)):
@@ -94,17 +127,21 @@ class RAGService:
             spec.min_rating = float(min_rating)
         categories = data.get('categories_any')
         if isinstance(categories, list):
-            spec.categories_any = [str(c) for c in categories if c]
+            valid = [str(c).lower() for c in categories if isinstance(c, str)]
+            spec.categories_any = [c for c in valid if c in _VALID_CATEGORIES]
         if data.get('above_median_downloads') is True:
             spec.above_median_downloads = True
+        requested_count = data.get('requested_count')
+        if isinstance(requested_count, int) and 1 <= requested_count <= 50:
+            spec.requested_count = requested_count
         return spec
 
     async def _generate_answer(self, query: str, sources: list[RetrievedApp]) -> str:
         """Render a context block from sources and call the LLM for the final answer."""
         if not sources:
-            return 'По базе не нашлось приложений, подходящих под запрос с учётом фильтров.'
+            return _NO_MATCHES_RU if _CYRILLIC_RE.search(query) else _NO_MATCHES_EN
         context = self._format_context(sources)
-        prompt = f'Запрос: {query}\n\nКонтекст (приложения из базы):\n{context}\n\nДай развёрнутый ответ.'
+        prompt = f'Query: {query}\n\nContext (apps from the catalog):\n{context}\n\nProvide a thorough answer.'
         return await self._client.generate(prompt=prompt, system=_ANSWER_SYSTEM_PROMPT)
 
     @staticmethod

@@ -58,7 +58,7 @@ class Config:
     EMBEDDING_BATCH_SIZE: int = 8
     EMBEDDING_GPU_MEM_LIMIT_MB: int = 3072
 
-    RAG_TOP_K: int = 20
+    RAG_TOP_K: int = 10
     RAG_CANDIDATE_K: int = 500
 
     API_HOST: str = '127.0.0.1'
