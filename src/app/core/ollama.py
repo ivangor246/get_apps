@@ -47,10 +47,12 @@ class OllamaClient:
         json_format: bool = False,
     ) -> str:
         """Generate a completion; set json_format=True to force JSON output."""
+        cfg = get_config()
         payload: dict = {
-            'model': self._llm_model_override or get_config().OLLAMA_LLM_MODEL,
+            'model': self._llm_model_override or cfg.OLLAMA_LLM_MODEL,
             'prompt': prompt,
             'stream': False,
+            'options': {'num_ctx': cfg.OLLAMA_CONTEXT_SIZE},
         }
         if system is not None:
             payload['system'] = system
@@ -73,10 +75,16 @@ class OllamaClient:
         return [str(item.get('name', '')) for item in data.get('models', []) if item.get('name')]
 
     async def load_model(self, name: str) -> None:
-        """Force a model into memory by issuing an empty generate with keep_alive."""
+        """Force a model into memory by issuing an empty generate with keep_alive and configured context."""
         await self._post_json(
             '/api/generate',
-            {'model': name, 'prompt': '', 'stream': False, 'keep_alive': '5m'},
+            {
+                'model': name,
+                'prompt': '',
+                'stream': False,
+                'keep_alive': '5m',
+                'options': {'num_ctx': get_config().OLLAMA_CONTEXT_SIZE},
+            },
         )
 
     async def _get_json(self, endpoint: str) -> dict:

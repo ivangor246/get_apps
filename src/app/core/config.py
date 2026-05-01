@@ -51,6 +51,7 @@ class Config:
     OLLAMA_URL: str = 'http://localhost:11434'
     OLLAMA_LLM_MODEL: str = 'gemma3:1b'
     OLLAMA_TIMEOUT: float = 120.0
+    OLLAMA_CONTEXT_SIZE: int = 10240
 
     EMBEDDING_MODEL: str = 'intfloat/multilingual-e5-large'
     EMBEDDING_DEVICE: str = 'cuda'

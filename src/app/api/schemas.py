@@ -7,6 +7,7 @@ class AppConfig(BaseModel):
     OLLAMA_URL: str
     OLLAMA_LLM_MODEL: str
     OLLAMA_TIMEOUT: float
+    OLLAMA_CONTEXT_SIZE: int
     EMBEDDING_MODEL: str
     EMBEDDING_DEVICE: str
     EMBEDDING_DIM: int
@@ -24,6 +25,7 @@ class AppConfigPatch(BaseModel):
     OLLAMA_URL: str | None = None
     OLLAMA_LLM_MODEL: str | None = None
     OLLAMA_TIMEOUT: float | None = None
+    OLLAMA_CONTEXT_SIZE: int | None = None
     EMBEDDING_MODEL: str | None = None
     EMBEDDING_DEVICE: str | None = None
     EMBEDDING_DIM: int | None = None

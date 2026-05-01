@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -10,7 +11,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUpdateConfig } from '../../../entities/config';
+import { useConfig, useUpdateConfig } from '../../../entities/config';
 import {
   OLLAMA_MODELS_KEY,
   useLoadOllamaModel,
@@ -20,6 +21,7 @@ import {
 export function ModelPicker() {
   const qc = useQueryClient();
   const modelsQ = useOllamaModels();
+  const configQ = useConfig();
   const updateConfig = useUpdateConfig();
   const loadMutation = useLoadOllamaModel();
 
@@ -36,12 +38,27 @@ export function ModelPicker() {
         ? 'loaded'
         : 'not loaded';
 
+  const savedCtx = configQ.data?.OLLAMA_CONTEXT_SIZE ?? 0;
+  const [ctxInput, setCtxInput] = useState<string>('');
+  useEffect(() => {
+    if (savedCtx > 0) setCtxInput(String(savedCtx));
+  }, [savedCtx]);
+
   const handleSelect = (value: string) => {
     if (value === current) return;
     updateConfig.mutate(
       { OLLAMA_LLM_MODEL: value },
       { onSuccess: () => qc.invalidateQueries({ queryKey: OLLAMA_MODELS_KEY }) },
     );
+  };
+
+  const commitContext = () => {
+    const parsed = Number(ctxInput);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed === savedCtx) {
+      setCtxInput(String(savedCtx));
+      return;
+    }
+    updateConfig.mutate({ OLLAMA_CONTEXT_SIZE: Math.floor(parsed) });
   };
 
   return (
@@ -104,7 +121,26 @@ export function ModelPicker() {
             </Button>
           </Stack>
 
-          <Typography variant="caption" color="text.secondary">
+          <TextField
+            label="Context size (tokens)"
+            type="number"
+            value={ctxInput}
+            onChange={(e) => setCtxInput(e.target.value)}
+            onBlur={commitContext}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            disabled={configQ.isLoading || updateConfig.isPending}
+            size="small"
+            inputProps={{ min: 1, step: 256 }}
+            helperText="Applied on next request; reload the model via Start to resize a loaded instance."
+            sx={{ minWidth: 240, mt: 1, mb: 1 }}
+          />
+
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             Status: {status} · {downloadedCount} local model{downloadedCount === 1 ? '' : 's'}
           </Typography>
 

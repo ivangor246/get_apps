@@ -2,6 +2,7 @@ export interface AppConfig {
   OLLAMA_URL: string;
   OLLAMA_LLM_MODEL: string;
   OLLAMA_TIMEOUT: number;
+  OLLAMA_CONTEXT_SIZE: number;
   EMBEDDING_MODEL: string;
   EMBEDDING_DEVICE: string;
   EMBEDDING_DIM: number;
