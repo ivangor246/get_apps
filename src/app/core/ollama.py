@@ -62,6 +62,32 @@ class OllamaClient:
             raise OllamaError(f'Unexpected generate response: {data!r}')
         return response
 
+    async def list_local_models(self) -> list[str]:
+        """Return names of models pulled to disk (GET /api/tags)."""
+        data = await self._get_json('/api/tags')
+        return [str(item.get('name', '')) for item in data.get('models', []) if item.get('name')]
+
+    async def list_loaded_models(self) -> list[str]:
+        """Return names of models currently resident in memory (GET /api/ps)."""
+        data = await self._get_json('/api/ps')
+        return [str(item.get('name', '')) for item in data.get('models', []) if item.get('name')]
+
+    async def load_model(self, name: str) -> None:
+        """Force a model into memory by issuing an empty generate with keep_alive."""
+        await self._post_json(
+            '/api/generate',
+            {'model': name, 'prompt': '', 'stream': False, 'keep_alive': '5m'},
+        )
+
+    async def _get_json(self, endpoint: str) -> dict:
+        try:
+            response = await self._client.get(endpoint)
+        except httpx.HTTPError as err:
+            raise OllamaError(f'Ollama request failed: {type(err).__name__}: {err}') from err
+        if response.status_code >= 400:
+            raise OllamaHTTPError(response.status_code, endpoint, response.text)
+        return response.json()
+
     async def _post_json(self, endpoint: str, payload: dict) -> dict:
         try:
             response = await self._client.post(endpoint, json=payload)

@@ -4,7 +4,9 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.config import get_config, get_tunable_defaults, settings_store
+from app.core.exceptions import OllamaError, OllamaHTTPError
 from app.core.jobs import JobManager
+from app.core.ollama import OllamaClient
 from app.services import RAGService
 from app.tasks.index import run_index_task
 from app.tasks.rustore import run_rustore_tasks
@@ -21,6 +23,9 @@ from .schemas import (
     IndexRequest,
     JobCreated,
     JobSnapshot,
+    OllamaModelLoadRequest,
+    OllamaModelInfo,
+    OllamaModelsResponse,
     OllamaStatusSchema,
     RAGQueryRequest,
     RAGQueryResponse,
@@ -77,6 +82,37 @@ async def write_config(patch: AppConfigPatch) -> AppConfig:
 async def read_config_defaults() -> AppConfig:
     """Return hardcoded defaults (ignoring any saved overrides)."""
     return AppConfig(**get_tunable_defaults())
+
+
+@router.get('/ollama/models', response_model=OllamaModelsResponse)
+async def list_ollama_models(request: Request) -> OllamaModelsResponse:
+    """List models available in the local Ollama instance with their loaded state."""
+    client: OllamaClient = request.app.state.ollama
+    current = get_config().OLLAMA_LLM_MODEL
+    try:
+        local = await client.list_local_models()
+    except OllamaError as err:
+        raise HTTPException(status_code=503, detail=f'Ollama unreachable: {err}') from err
+    try:
+        loaded = set(await client.list_loaded_models())
+    except OllamaError:
+        loaded = set()
+    models = [OllamaModelInfo(name=name, loaded=name in loaded) for name in local]
+    if current and current not in local:
+        models.insert(0, OllamaModelInfo(name=current, loaded=False))
+    return OllamaModelsResponse(current=current, models=models)
+
+
+@router.post('/ollama/models/load', status_code=204)
+async def load_ollama_model(request: Request, body: OllamaModelLoadRequest) -> None:
+    """Pin the specified model into Ollama memory by issuing an empty generate call."""
+    client: OllamaClient = request.app.state.ollama
+    try:
+        await client.load_model(body.model)
+    except OllamaHTTPError as err:
+        raise HTTPException(status_code=err.status_code, detail=err.body) from err
+    except OllamaError as err:
+        raise HTTPException(status_code=503, detail=str(err)) from err
 
 
 @router.get('/databases', response_model=DatabasesResponse)

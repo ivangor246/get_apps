@@ -50,6 +50,26 @@ class SystemStatusSchema(BaseModel):
     ollama: OllamaStatusSchema
 
 
+class OllamaModelInfo(BaseModel):
+    """One locally available Ollama model with its current loaded state."""
+
+    name: str
+    loaded: bool
+
+
+class OllamaModelsResponse(BaseModel):
+    """Listing of locally available Ollama models plus the currently configured choice."""
+
+    current: str
+    models: list[OllamaModelInfo]
+
+
+class OllamaModelLoadRequest(BaseModel):
+    """Request body for POST /ollama/models/load."""
+
+    model: str = Field(..., min_length=1)
+
+
 class CollectCategoriesRequest(BaseModel):
     concurrency: int = Field(default=3, ge=1, le=16)
 
