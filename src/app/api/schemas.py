@@ -51,9 +51,10 @@ class SystemStatusSchema(BaseModel):
 
 
 class OllamaModelInfo(BaseModel):
-    """One locally available Ollama model with its current loaded state."""
+    """One Ollama model entry: name plus its downloaded and currently-loaded state."""
 
     name: str
+    downloaded: bool
     loaded: bool
 
 

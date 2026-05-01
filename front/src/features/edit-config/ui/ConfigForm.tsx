@@ -20,7 +20,6 @@ type FieldSpec = {
 
 const FIELDS: FieldSpec[] = [
   { key: 'OLLAMA_URL', label: 'Ollama URL', type: 'text', group: 'Ollama' },
-  { key: 'OLLAMA_LLM_MODEL', label: 'LLM model', type: 'text', group: 'Ollama' },
   { key: 'OLLAMA_TIMEOUT', label: 'Timeout (s)', type: 'number', group: 'Ollama' },
 
   { key: 'EMBEDDING_MODEL', label: 'Embedding model', type: 'text', group: 'Embedding' },

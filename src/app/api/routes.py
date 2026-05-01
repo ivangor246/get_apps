@@ -97,9 +97,9 @@ async def list_ollama_models(request: Request) -> OllamaModelsResponse:
         loaded = set(await client.list_loaded_models())
     except OllamaError:
         loaded = set()
-    models = [OllamaModelInfo(name=name, loaded=name in loaded) for name in local]
+    models = [OllamaModelInfo(name=name, downloaded=True, loaded=name in loaded) for name in local]
     if current and current not in local:
-        models.insert(0, OllamaModelInfo(name=current, loaded=False))
+        models.insert(0, OllamaModelInfo(name=current, downloaded=False, loaded=False))
     return OllamaModelsResponse(current=current, models=models)
 
 
