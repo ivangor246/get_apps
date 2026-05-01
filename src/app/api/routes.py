@@ -50,7 +50,7 @@ async def system_status(request: Request) -> SystemStatusSchema:
         ollama=OllamaStatusSchema(
             status=state.status.value,
             detail=state.detail,
-            model=state.model,
+            model=get_config().OLLAMA_LLM_MODEL,
         ),
     )
 

@@ -4,7 +4,7 @@ from types import TracebackType
 
 import httpx
 
-from .config import config
+from .config import config, get_config
 from .exceptions import OllamaError, OllamaHTTPError
 
 
@@ -18,7 +18,7 @@ class OllamaClient:
         timeout: float | None = None,
     ):
         self._base_url = (base_url or config.OLLAMA_URL).rstrip('/')
-        self._llm_model = llm_model or config.OLLAMA_LLM_MODEL
+        self._llm_model_override = llm_model
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
             timeout=timeout or config.OLLAMA_TIMEOUT,
@@ -48,7 +48,7 @@ class OllamaClient:
     ) -> str:
         """Generate a completion; set json_format=True to force JSON output."""
         payload: dict = {
-            'model': self._llm_model,
+            'model': self._llm_model_override or get_config().OLLAMA_LLM_MODEL,
             'prompt': prompt,
             'stream': False,
         }

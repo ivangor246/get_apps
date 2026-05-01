@@ -68,13 +68,7 @@ class OllamaRuntime:
             self._set(OllamaStatus.CHECKING_MODEL)
             available = await self._list_models()
             if not self._has_model(available):
-                cmd = f'ollama pull {self._model}'
-                self._set(OllamaStatus.MODEL_MISSING, cmd)
-                logger.warning(
-                    'Ollama model %r not found. To install it run: %s',
-                    self._model,
-                    cmd,
-                )
+                self._set(OllamaStatus.MODEL_MISSING, f'ollama pull {self._model}')
                 return
             self._set(OllamaStatus.WARMING_UP)
             try:
