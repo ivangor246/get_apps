@@ -6,8 +6,7 @@ from dataclasses import dataclass
 from chromadb.api.models.Collection import Collection
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core import OllamaClient, TextEmbedder
-from app.core.config import config
+from app.core import OllamaClient, TextEmbedder, config
 
 from .retrieval import FilterSpec, RetrievalService, RetrievedApp
 
@@ -177,7 +176,12 @@ class RAGService:
         search_query = analysis.search_query or query
         sources = await self._retrieval.search(search_query, analysis.filters, top_k=effective_top_k)
         sources, iterations = await self._refine_via_critique(
-            query, analysis.language, analysis.filters, search_query, sources, effective_top_k,
+            query,
+            analysis.language,
+            analysis.filters,
+            search_query,
+            sources,
+            effective_top_k,
         )
         answer_text = await self._generate_answer(query, analysis.language, sources)
         return RAGResponse(
@@ -248,11 +252,7 @@ class RAGService:
         if not sources:
             return CritiqueDecision(keep_indices=[], revised_search_query=None)
         listing = self._format_for_critique(sources)
-        prompt = (
-            f'User query: {query}\n'
-            f'Query language: {language or "unknown"}\n\n'
-            f'Sources:\n{listing}'
-        )
+        prompt = f'User query: {query}\nQuery language: {language or "unknown"}\n\nSources:\n{listing}'
         try:
             raw = await self._client.generate(
                 prompt=prompt,
@@ -284,9 +284,7 @@ class RAGService:
         """Render the source context and call the LLM with a hard language pin."""
         context = self._format_context(sources) if sources else '(no apps matched the query)'
         lang_pin = (
-            f'Reply strictly in language "{language}".'
-            if language
-            else 'Reply in the same language as the user query.'
+            f'Reply strictly in language "{language}".' if language else 'Reply in the same language as the user query.'
         )
         prompt = (
             f'{lang_pin}\n\n'

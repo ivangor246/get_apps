@@ -3,7 +3,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.core.config import config, get_tunable_defaults, settings_store
+from app.core import config
 from app.core.exceptions import OllamaError, OllamaHTTPError
 from app.core.jobs import JobManager
 from app.core.ollama import OllamaClient
@@ -13,8 +13,6 @@ from app.tasks.rustore import run_rustore_tasks
 from app.tasks.rustore_app_info import run_rustore_app_info_tasks
 
 from .schemas import (
-    AppConfig,
-    AppConfigPatch,
     AppliedFilters,
     CategoriesRunsResponse,
     CollectAppsRequest,
@@ -58,28 +56,6 @@ async def system_status(request: Request) -> SystemStatusSchema:
             model=config.OLLAMA_LLM_MODEL,
         ),
     )
-
-
-@router.get('/config', response_model=AppConfig)
-async def read_config() -> AppConfig:
-    """Return current effective config (defaults merged with saved overrides)."""
-    return AppConfig(**{k: getattr(config, k) for k in get_tunable_defaults().keys()})
-
-
-@router.put('/config', response_model=AppConfig)
-async def write_config(patch: AppConfigPatch) -> AppConfig:
-    """Merge patch into saved overrides; persists to saved_data/config.json."""
-    existing = settings_store.load()
-    updates = patch.model_dump(exclude_unset=True, exclude_none=False)
-    merged = {**existing, **updates}
-    settings_store.save(merged)
-    return AppConfig(**{k: getattr(config, k) for k in get_tunable_defaults().keys()})
-
-
-@router.get('/config/defaults', response_model=AppConfig)
-async def read_config_defaults() -> AppConfig:
-    """Return hardcoded defaults (ignoring any saved overrides)."""
-    return AppConfig(**get_tunable_defaults())
 
 
 @router.get('/ollama/models', response_model=OllamaModelsResponse)
