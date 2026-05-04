@@ -34,29 +34,34 @@ All three are exposed as HTTP endpoints; there is no CLI. Long-running work runs
 ## Folder Structure
 
 ```
-src/app/
-├── main.py           # Thin uvicorn entrypoint
-├── api/              # FastAPI app factory, routes, pydantic schemas
-├── core/             # config, jobs (SSE), db, chroma, ollama, embedder
-├── tasks/            # Async coroutines wrapping each collection / index run
-├── services/         # Domain services (Rustore*, RAG, Retrieval, EmbeddingIndexer)
-│   └── parsers/      # Playwright + BeautifulSoup page parsers
-└── models/           # SQLAlchemy ORM models
+back/                              # Backend root (Poetry project)
+├── pyproject.toml
+├── poetry.lock
+├── src/app/
+│   ├── main.py                    # Thin uvicorn entrypoint
+│   ├── api/                       # FastAPI app factory, routes, pydantic schemas
+│   ├── core/                      # config, jobs (SSE), db, chroma, ollama, embedder
+│   ├── tasks/                     # Async coroutines wrapping each collection / index run
+│   ├── services/                  # Domain services (Rustore*, RAG, Retrieval, EmbeddingIndexer)
+│   │   └── parsers/               # Playwright + BeautifulSoup page parsers
+│   └── models/                    # SQLAlchemy ORM models
+├── cache_dir/                     # fastembed / HuggingFace model cache
+└── saved_data/
+    ├── categories/{timestamp}/*.txt   # raw app IDs per category per run
+    ├── databases/{name}.sqlite3       # collected app metadata, one DB per run set
+    ├── chroma/{name}/                 # persistent vector index, one dir per DB
+    └── config.json                    # user overrides of runtime config
 
-front/src/            # Feature-Sliced Design:
-├── app/              # App component + providers (theme, query client, router)
-├── pages/            # home, collection, indexing, settings
-├── widgets/          # app-header, db-selector, job-log-viewer
-├── features/         # toggle-theme, edit-config, run-*, submit-rag-query
-├── entities/         # config, database, job, rag-result
-└── shared/           # api client, SSE helper, theme, config
-
-saved_data/
-├── categories/{timestamp}/*.txt      # raw app IDs per category per run
-├── databases/{name}.sqlite3          # collected app metadata, one DB per run set
-├── chroma/{name}/                    # persistent vector index, one dir per DB
-└── config.json                       # user overrides of runtime config
+front/src/                         # Feature-Sliced Design:
+├── app/                           # App component + providers (theme, query client, router)
+├── pages/                         # home, collection, indexing, settings
+├── widgets/                       # app-header, db-selector, job-log-viewer
+├── features/                      # toggle-theme, edit-config, run-*, submit-rag-query
+├── entities/                      # config, database, job, rag-result
+└── shared/                        # api client, SSE helper, theme, config
 ```
+
+All Poetry/uvicorn commands run from `back/` (see `Makefile`).
 
 ## Architecture
 
@@ -72,7 +77,7 @@ saved_data/
 
 ## Configuration
 
-**No `.env` files.** Hardcoded defaults live in [src/app/core/config.py](src/app/core/config.py); user overrides persist to `saved_data/config.json` and are edited from the Settings page.
+**No `.env` files.** Hardcoded defaults live in [back/src/app/core/config.py](back/src/app/core/config.py); user overrides persist to `back/saved_data/config.json` and are edited from the Settings page.
 
 - Tunable (settable from UI): Ollama URL/model/timeout, embedding model/device/dim/batch/VRAM cap, RAG top_k/candidate_k, API host/port.
 - Not tunable (code-only): file paths, RuStore URLs + category list, pagination count.

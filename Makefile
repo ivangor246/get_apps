@@ -5,14 +5,14 @@
 install: install-backend install-frontend
 
 install-backend:
-	poetry install
-	poetry run playwright install chromium
+	cd back && poetry install
+	cd back && poetry run playwright install chromium
 
 install-frontend:
 	npm --prefix front install
 
 dev-backend:
-	poetry run uvicorn app.api.app:create_app --factory --reload --host 127.0.0.1 --port 8000
+	cd back && poetry run uvicorn app.api.app:create_app --factory --reload --host 127.0.0.1 --port 8000
 
 dev-frontend:
 	npm --prefix front run dev
@@ -30,7 +30,7 @@ build-frontend:
 	npm --prefix front run build
 
 start:
-	poetry run python -m app.main
+	cd back && poetry run python -m app.main
 
 clean:
 	rm -rf front/dist front/node_modules/.vite

@@ -25,7 +25,7 @@ ollama pull gemma3:1b
 ollama serve   # если не запущен как сервис
 ```
 
-Эмбеддинги считаются локально через `fastembed-gpu` (`intfloat/multilingual-e5-large`). Модель и URL Ollama меняются в UI на странице **Settings** — значения сохраняются в `saved_data/config.json`.
+Эмбеддинги считаются локально через `fastembed-gpu` (`intfloat/multilingual-e5-large`). Модель и URL Ollama меняются в UI на странице **Settings** — значения сохраняются в `back/saved_data/config.json`.
 
 ## Запуск
 
@@ -57,19 +57,22 @@ make start    # uvicorn отдаёт и API, и статику фронта на
 ## Структура
 
 ```
-src/app/
-├── main.py           # uvicorn entrypoint
-├── api/              # FastAPI (create_app, routes, schemas)
-├── core/             # config, jobs (SSE), db, ollama, chroma, embedder
-├── models/           # ORM (AppInfo)
-├── services/         # парсеры, сбор, индексация, retrieval, RAG
-└── tasks/            # корутины-обёртки для фоновых задач
+back/                              # бэкенд (Poetry-проект)
+├── pyproject.toml
+├── poetry.lock
+├── src/app/
+│   ├── main.py                    # uvicorn entrypoint
+│   ├── api/                       # FastAPI (create_app, routes, schemas)
+│   ├── core/                      # config, jobs (SSE), db, ollama, chroma, embedder
+│   ├── models/                    # ORM (AppInfo)
+│   ├── services/                  # парсеры, сбор, индексация, retrieval, RAG
+│   └── tasks/                     # корутины-обёртки для фоновых задач
+├── cache_dir/                     # кэш моделей fastembed / HuggingFace
+└── saved_data/
+    ├── categories/<timestamp>/<category>.txt
+    ├── databases/<name>.sqlite3
+    ├── chroma/<name>/
+    └── config.json                # пользовательские оверрайды конфига
 
-front/src/            # FSD: app / pages / widgets / features / entities / shared
-
-saved_data/
-├── categories/<timestamp>/<category>.txt
-├── databases/<name>.sqlite3
-├── chroma/<name>/
-└── config.json       # пользовательские оверрайды конфига
+front/src/                         # FSD: app / pages / widgets / features / entities / shared
 ```
