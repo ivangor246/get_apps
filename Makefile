@@ -12,7 +12,7 @@ install-frontend:
 	npm --prefix front install
 
 dev-backend:
-	cd back && poetry run uvicorn app.api.app:create_app --factory --reload --host 127.0.0.1 --port 8000
+	cd back && poetry run uvicorn app.main:create_app --factory --reload --host 127.0.0.1 --port 8000
 
 dev-frontend:
 	npm --prefix front run dev
