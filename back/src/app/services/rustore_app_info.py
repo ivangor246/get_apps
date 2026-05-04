@@ -8,7 +8,7 @@ from app.core.db import build_engine, build_sessionmaker, init_db
 from app.models import AppInfo
 
 from .category_loader import CategoryLoader
-from .parsers.rustore_app_info import RustoreAppInfoParser
+from .parsers import RustoreAppInfoParser
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +16,19 @@ logger = logging.getLogger(__name__)
 class RustoreAppInfoService:
     """Orchestrate parsing of RuStore app pages into a SQLite database."""
 
-    def __init__(self, db_name: str, folder_name: str | None = None, concurrency: int = 3) -> None:
+    def __init__(
+        self,
+        db_name: str,
+        folder_name: str | None = None,
+        concurrency: int = 3,
+    ) -> None:
         self.db_name = db_name
         self.folder_name = folder_name
         self.concurrency = concurrency
 
     async def run(self) -> None:
         """Resolve target folder, load app IDs, and persist each parsed app page."""
+
         folder = CategoryLoader.resolve_folder(self.folder_name)
         all_ids = CategoryLoader.load_unique_app_ids(folder)
 
@@ -43,6 +49,7 @@ class RustoreAppInfoService:
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             context = await browser.new_context()
+
             try:
                 tasks = [self._process_app(context, session_factory, app_id) for app_id in pending]
                 await asyncio.gather(*tasks)
@@ -53,6 +60,7 @@ class RustoreAppInfoService:
     @staticmethod
     async def _load_processed_ids(session_factory) -> set[str]:
         """Return the set of app IDs already stored in the database."""
+
         async with session_factory() as session:
             result = await session.execute(select(AppInfo.app_id))
             return {row[0] for row in result.all()}
@@ -60,11 +68,13 @@ class RustoreAppInfoService:
     @staticmethod
     async def _process_app(context, session_factory, app_id: str) -> None:
         """Parse a single app page and commit it in its own session for resumability."""
+
         try:
             data = await RustoreAppInfoParser.parse_app(context, app_id)
         except Exception:
             logger.exception('Failed to parse app "%s"', app_id)
             return
+
         try:
             async with session_factory() as session:
                 session.add(AppInfo(**data))

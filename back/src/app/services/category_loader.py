@@ -13,6 +13,7 @@ class CategoryLoader:
     @staticmethod
     def resolve_folder(folder_name: str | None = None) -> Path:
         """Return target timestamp folder; latest by name if folder_name is None."""
+
         if folder_name is not None:
             path = config.CATEGORIES_DIR / folder_name
             if not path.is_dir():
@@ -41,6 +42,7 @@ class CategoryLoader:
     @staticmethod
     def load_unique_app_ids(folder: Path) -> list[str]:
         """Read all *.txt files in folder and return a sorted list of unique app IDs."""
+
         unique: set[str] = set()
         for txt in folder.glob('*.txt'):
             for line in txt.read_text(encoding='utf-8').splitlines():

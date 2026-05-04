@@ -51,8 +51,14 @@ class RetrievalService:
         self._embedder = embedder
         self._collection = collection
 
-    async def search(self, query_text: str, filters: FilterSpec, top_k: int | None = None) -> list[RetrievedApp]:
+    async def search(
+        self,
+        query_text: str,
+        filters: FilterSpec,
+        top_k: int | None = None,
+    ) -> list[RetrievedApp]:
         """Embed the query, run oversampled kNN in Chroma, filter via SQL with relax-fallback, return top_k."""
+
         top_k = top_k or config.RAG_TOP_K
         query_vector = await self._embedder.embed_query(query_text)
 
@@ -63,14 +69,17 @@ class RetrievalService:
         )
         candidate_ids: list[str] = knn['ids'][0] if knn.get('ids') else []
         distances: list[float] = knn['distances'][0] if knn.get('distances') else []
+
         if not candidate_ids:
             return []
+
         distance_map = dict(zip(candidate_ids, distances, strict=True))
 
         async with self._session_factory() as session:
             for attempt_filters, label in self._relaxation_chain(filters):
                 median = await self._median_downloads(session) if attempt_filters.above_median_downloads else None
                 rows = await self._filter_candidates(session, candidate_ids, attempt_filters, median)
+
                 if rows:
                     if label != 'original':
                         logger.info('retrieval relaxed: %s (matched %d rows)', label, len(rows))
@@ -81,32 +90,41 @@ class RetrievalService:
                     ]
                     results.sort(key=lambda app: app.distance)
                     return results[:top_k]
+
                 logger.info('retrieval empty at stage: %s', label)
+
         return []
 
     @staticmethod
     def _relaxation_chain(filters: FilterSpec) -> list[tuple[FilterSpec, str]]:
         """Yield progressively relaxed FilterSpecs to retry on empty results."""
+
         chain: list[tuple[FilterSpec, str]] = [(filters, 'original')]
         has_categories = bool(filters.categories_any) or filters.above_median_downloads
+
         if has_categories:
-            chain.append((
-                FilterSpec(
-                    min_downloads=filters.min_downloads,
-                    max_downloads=filters.max_downloads,
-                    min_rating=filters.min_rating,
-                    requested_count=filters.requested_count,
-                ),
-                'dropped categories and above_median',
-            ))
+            chain.append(
+                (
+                    FilterSpec(
+                        min_downloads=filters.min_downloads,
+                        max_downloads=filters.max_downloads,
+                        min_rating=filters.min_rating,
+                        requested_count=filters.requested_count,
+                    ),
+                    'dropped categories and above_median',
+                )
+            )
+
         has_any_structural = (
             filters.min_downloads is not None
             or filters.max_downloads is not None
             or filters.min_rating is not None
             or has_categories
         )
+
         if has_any_structural:
             chain.append((FilterSpec(requested_count=filters.requested_count), 'semantic-only'))
+
         return chain
 
     @staticmethod
@@ -140,6 +158,7 @@ class RetrievalService:
             'FROM app_info '
             f'WHERE {" AND ".join(where)}'
         ).bindparams(bindparam('candidate_ids', expanding=True))
+
         if filters.categories_any:
             sql = sql.bindparams(bindparam('categories_any', expanding=True))
 
@@ -149,6 +168,7 @@ class RetrievalService:
     @staticmethod
     async def _median_downloads(session: AsyncSession) -> int:
         """Compute the median of non-null downloads in app_info via window functions."""
+
         result = await session.execute(
             text(
                 'WITH ordered AS ('
@@ -166,14 +186,19 @@ class RetrievalService:
 
     @staticmethod
     def _row_to_app(row: dict, distance: float) -> RetrievedApp:
+        """Convert a SQL row + Chroma distance into a RetrievedApp, normalizing the categories field."""
+
         categories = row.get('categories')
+
         if isinstance(categories, str):
             try:
                 categories = json.loads(categories)
             except json.JSONDecodeError:
                 categories = []
+
         if not isinstance(categories, list):
             categories = []
+
         return RetrievedApp(
             app_id=row['app_id'],
             name=row.get('name'),

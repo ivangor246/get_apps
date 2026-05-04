@@ -152,8 +152,13 @@ class RAGService:
         self._client = client
         self._retrieval = RetrievalService(session_factory, embedder, collection)
 
-    async def answer(self, query: str, top_k: int | None = None) -> RAGResponse:
+    async def answer(
+        self,
+        query: str,
+        top_k: int | None = None,
+    ) -> RAGResponse:
         """Run the full RAG pipeline: analyze → retrieve → critique (with optional retry) → answer."""
+
         analysis = await self._analyze(query)
         logger.info(
             'analyze: intent=%s language=%s filters=%s search_query=%r',
@@ -162,6 +167,7 @@ class RAGService:
             analysis.filters,
             analysis.search_query[:120],
         )
+
         if analysis.intent == 'smalltalk' and analysis.smalltalk_reply:
             return RAGResponse(
                 answer=analysis.smalltalk_reply,
@@ -184,6 +190,7 @@ class RAGService:
             effective_top_k,
         )
         answer_text = await self._generate_answer(query, analysis.language, sources)
+
         return RAGResponse(
             answer=answer_text,
             filters=analysis.filters,
@@ -203,6 +210,7 @@ class RAGService:
         top_k: int | None,
     ) -> tuple[list[RetrievedApp], int]:
         """Apply at most one critique pass + one retrieval retry; return surviving sources and retrieval iteration count."""
+
         decision = await self._critique(query, language, sources)
         logger.info(
             'critique 1: kept %d/%d revised=%r',
@@ -210,12 +218,14 @@ class RAGService:
             len(sources),
             (decision.revised_search_query or '')[:120],
         )
+
         if decision.keep_indices:
             return [sources[i - 1] for i in decision.keep_indices], 1
         if not sources:
             return sources, 1
         if not decision.revised_search_query or decision.revised_search_query == search_query:
             return sources, 1
+
         retry_sources = await self._retrieval.search(decision.revised_search_query, filters, top_k=top_k)
         retry_decision = await self._critique(query, language, retry_sources)
         logger.info(
@@ -223,12 +233,15 @@ class RAGService:
             len(retry_decision.keep_indices),
             len(retry_sources),
         )
+
         if retry_decision.keep_indices:
             return [retry_sources[i - 1] for i in retry_decision.keep_indices], 2
+
         return retry_sources, 2
 
     async def _analyze(self, query: str) -> QueryAnalysis:
         """Single LLM call producing intent, language, HyDE search query, filters, and an optional smalltalk reply."""
+
         try:
             raw = await self._client.generate(
                 prompt=f'User query: {query}',
@@ -238,21 +251,32 @@ class RAGService:
         except Exception:
             logger.exception('analyze failed; falling back to defaults')
             return _default_analysis(query)
+
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning('analyze returned non-JSON: %r', raw[:200])
             return _default_analysis(query)
+
         if not isinstance(data, dict):
             return _default_analysis(query)
+
         return _coerce_analysis(query, data)
 
-    async def _critique(self, query: str, language: str, sources: list[RetrievedApp]) -> CritiqueDecision:
+    async def _critique(
+        self,
+        query: str,
+        language: str,
+        sources: list[RetrievedApp],
+    ) -> CritiqueDecision:
         """Single LLM call that judges retrieved sources and may suggest a rewritten search query."""
+
         if not sources:
             return CritiqueDecision(keep_indices=[], revised_search_query=None)
+
         listing = self._format_for_critique(sources)
         prompt = f'User query: {query}\nQuery language: {language or "unknown"}\n\nSources:\n{listing}'
+
         try:
             raw = await self._client.generate(
                 prompt=prompt,
@@ -262,26 +286,39 @@ class RAGService:
         except Exception:
             logger.exception('critique failed; keeping all sources')
             return CritiqueDecision(keep_indices=list(range(1, len(sources) + 1)), revised_search_query=None)
+
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning('critique returned non-JSON: %r', raw[:200])
             return CritiqueDecision(keep_indices=list(range(1, len(sources) + 1)), revised_search_query=None)
+
         if not isinstance(data, dict):
             return CritiqueDecision(keep_indices=list(range(1, len(sources) + 1)), revised_search_query=None)
+
         return _coerce_critique(data, len(sources))
 
     @staticmethod
     def _format_for_critique(sources: list[RetrievedApp]) -> str:
+        """Render retrieved apps as a numbered, truncated list for the critique prompt."""
+
         lines: list[str] = []
+
         for idx, app in enumerate(sources, start=1):
             name = app.name or app.app_id
             desc = (app.description or '').strip().replace('\n', ' ')[:200]
             lines.append(f'[{idx}] {name} — {desc}')
+
         return '\n'.join(lines)
 
-    async def _generate_answer(self, query: str, language: str, sources: list[RetrievedApp]) -> str:
+    async def _generate_answer(
+        self,
+        query: str,
+        language: str,
+        sources: list[RetrievedApp],
+    ) -> str:
         """Render the source context and call the LLM with a hard language pin."""
+
         context = self._format_context(sources) if sources else '(no apps matched the query)'
         lang_pin = (
             f'Reply strictly in language "{language}".' if language else 'Reply in the same language as the user query.'
@@ -292,28 +329,36 @@ class RAGService:
             f'Context (apps from the catalog):\n{context}\n\n'
             f'Provide a thorough answer in the requested language.'
         )
+
         return await self._client.generate(prompt=prompt, system=_ANSWER_SYSTEM_PROMPT)
 
     @staticmethod
     def _format_context(sources: list[RetrievedApp]) -> str:
+        """Render retrieved apps as numbered blocks with metadata and description for the answer prompt."""
+
         blocks: list[str] = []
+
         for idx, app in enumerate(sources, start=1):
             header = f'[{idx}] {app.name or app.app_id}'
             meta_parts: list[str] = []
+
             if app.downloads is not None:
                 meta_parts.append(f'скачиваний: {app.downloads}')
             if app.rating is not None:
                 meta_parts.append(f'рейтинг: {app.rating}')
             if app.categories:
                 meta_parts.append(f'категории: {", ".join(app.categories)}')
+
             meta = ' | '.join(meta_parts)
             description = (app.description or '').strip().replace('\n', ' ')[:500]
             blocks.append(f'{header}\n{meta}\nОписание: {description}')
+
         return '\n\n'.join(blocks)
 
 
 def _default_analysis(query: str) -> QueryAnalysis:
     """Safe fallback used when the analyze LLM call fails or returns malformed output."""
+
     return QueryAnalysis(
         intent='app_query',
         language='',
@@ -325,6 +370,7 @@ def _default_analysis(query: str) -> QueryAnalysis:
 
 def _coerce_analysis(query: str, data: dict) -> QueryAnalysis:
     """Normalize the raw analyze JSON into a QueryAnalysis with safe defaults."""
+
     intent_raw = data.get('intent')
     intent = intent_raw if intent_raw in _VALID_INTENTS else 'app_query'
 
@@ -351,50 +397,65 @@ def _coerce_analysis(query: str, data: dict) -> QueryAnalysis:
 
 def _coerce_filter(query: str, data: dict) -> FilterSpec:
     """Coerce the filters JSON into a FilterSpec; reject categories the user did not actually mention."""
+
     spec = FilterSpec()
+
     min_downloads = data.get('min_downloads')
     if isinstance(min_downloads, (int, float)):
         spec.min_downloads = int(min_downloads)
+
     max_downloads = data.get('max_downloads')
     if isinstance(max_downloads, (int, float)):
         spec.max_downloads = int(max_downloads)
+
     min_rating = data.get('min_rating')
     if isinstance(min_rating, (int, float)):
         spec.min_rating = float(min_rating)
+
     categories = data.get('categories_any')
     if isinstance(categories, list):
         valid = [str(c).lower() for c in categories if isinstance(c, str)]
         whitelisted = [c for c in valid if c in _VALID_CATEGORIES]
         spec.categories_any = _sanitize_categories(query, whitelisted)
+
     if data.get('above_median_downloads') is True:
         spec.above_median_downloads = True
+
     requested_count = data.get('requested_count')
     if isinstance(requested_count, int) and 1 <= requested_count <= 50:
         spec.requested_count = requested_count
+
     return spec
 
 
 def _coerce_critique(data: dict, source_count: int) -> CritiqueDecision:
     """Coerce raw critique JSON into CritiqueDecision; clamp indices to valid range and dedupe."""
+
     raw_indices = data.get('keep_indices')
     keep: list[int] = []
+
     if isinstance(raw_indices, list):
         seen: set[int] = set()
+
         for value in raw_indices:
             if isinstance(value, bool):
                 continue
             if isinstance(value, int) and 1 <= value <= source_count and value not in seen:
                 seen.add(value)
                 keep.append(value)
+
     revised_raw = data.get('revised_search_query')
     revised = revised_raw.strip() if isinstance(revised_raw, str) else ''
+
     return CritiqueDecision(keep_indices=keep, revised_search_query=revised or None)
 
 
 def _sanitize_categories(query: str, categories: list[str]) -> list[str]:
     """Drop any category whose synonyms do not appear in the original query — defends against LLM hallucinations."""
+
     haystack = query.lower()
     kept: list[str] = []
+
     for cat in categories:
         pattern = _CATEGORY_PATTERNS.get(cat)
         if pattern is None:
@@ -403,4 +464,5 @@ def _sanitize_categories(query: str, categories: list[str]) -> list[str]:
             kept.append(cat)
         else:
             logger.info('sanitize: dropped hallucinated category %r (not mentioned in query)', cat)
+
     return kept
