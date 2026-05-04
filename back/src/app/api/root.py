@@ -9,11 +9,11 @@ from .routers.tasks import router as tasks_router
 
 ROUTERS: list[APIRouter] = [
     health_router,
-    system_router,
     ollama_router,
-    storage_router,
-    tasks_router,
     rag_router,
+    storage_router,
+    system_router,
+    tasks_router,
 ]
 
 router = APIRouter(prefix='/api')

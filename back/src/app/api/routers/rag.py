@@ -2,10 +2,15 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Request
 
-from app.schemas import AppliedFilters, RAGQueryRequest, RAGQueryResponse, SourceApp
+from app.schemas import (
+    AppliedFilters,
+    RAGQueryRequest,
+    RAGQueryResponse,
+    SourceApp,
+)
 from app.services import RAGService
 
-router = APIRouter(prefix='/rag')
+router = APIRouter(prefix='/rag', tags=['rag'])
 
 
 @router.post('/query', response_model=RAGQueryResponse)

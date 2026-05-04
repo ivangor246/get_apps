@@ -1,9 +1,12 @@
 from fastapi import APIRouter
 
 from app.core import config
-from app.schemas import CategoriesRunsResponse, DatabasesResponse
+from app.schemas import (
+    CategoriesRunsResponse,
+    DatabasesResponse,
+)
 
-router = APIRouter()
+router = APIRouter(tags=['storage'])
 
 
 @router.get('/databases', response_model=DatabasesResponse)

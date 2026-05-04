@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Request
 
 from app.core import config
-from app.schemas import OllamaStatusSchema, SystemStatusSchema
+from app.schemas import (
+    OllamaStatusSchema,
+    SystemStatusSchema,
+)
 
-router = APIRouter()
+router = APIRouter(tags=['system'])
 
 
 @router.get('/status', response_model=SystemStatusSchema)

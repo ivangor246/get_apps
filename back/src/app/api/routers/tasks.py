@@ -13,7 +13,7 @@ from app.tasks.index import run_index_task
 from app.tasks.rustore import run_rustore_tasks
 from app.tasks.rustore_app_info import run_rustore_app_info_tasks
 
-router = APIRouter(prefix='/tasks')
+router = APIRouter(prefix='/tasks', tags=['tasks'])
 
 
 def _jobs(request: Request) -> JobManager:

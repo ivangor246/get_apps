@@ -3,9 +3,13 @@ from fastapi import APIRouter, HTTPException, Request
 from app.core import config
 from app.core.exceptions import OllamaError, OllamaHTTPError
 from app.core.ollama import OllamaClient
-from app.schemas import OllamaModelInfo, OllamaModelLoadRequest, OllamaModelsResponse
+from app.schemas import (
+    OllamaModelInfo,
+    OllamaModelLoadRequest,
+    OllamaModelsResponse,
+)
 
-router = APIRouter(prefix='/ollama')
+router = APIRouter(prefix='/ollama', tags=['ollama'])
 
 
 @router.get('/models', response_model=OllamaModelsResponse)
