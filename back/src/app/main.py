@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import router
+from app.api.root import router
 from app.core import config
 from app.core.lifespan import lifespan
 
