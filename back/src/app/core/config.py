@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urljoin
@@ -42,29 +42,27 @@ class Config:
     RUSTORE_CATALOG_URL: str = urljoin(_RUSTORE_URL, 'catalog/')
     RUSTORE_APP_URL: str = urljoin(_RUSTORE_URL, 'catalog/app/')
     RUSTORE_APP_NAME_PREFIX: str = '/catalog/app/'
-    RUSTORE_CATEGORIES: list[str] = field(
-        default_factory=lambda: [
-            'finance',
-            'state',
-            'tools',
-            'transport',
-            'purchases',
-            'social',
-            'entertainment',
-            'adsandservices',
-            'business',
-            'health',
-            'travelling',
-            'education',
-            'books',
-            'lifestyle',
-            'sport',
-            'news',
-            'parenting',
-            'pets',
-            'gambling',
-            'foodanddrink',
-        ]
+    RUSTORE_CATEGORIES: tuple[str, ...] = (
+        'finance',
+        'state',
+        'tools',
+        'transport',
+        'purchases',
+        'social',
+        'entertainment',
+        'adsandservices',
+        'business',
+        'health',
+        'travelling',
+        'education',
+        'books',
+        'lifestyle',
+        'sport',
+        'news',
+        'parenting',
+        'pets',
+        'gambling',
+        'foodanddrink',
     )
     RUSTORE_PAGES_COUNT: int = 10
 
