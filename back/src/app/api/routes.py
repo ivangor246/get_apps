@@ -3,7 +3,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.core.config import get_config, get_tunable_defaults, settings_store
+from app.core.config import config, get_tunable_defaults, settings_store
 from app.core.exceptions import OllamaError, OllamaHTTPError
 from app.core.jobs import JobManager
 from app.core.ollama import OllamaClient
@@ -23,8 +23,8 @@ from .schemas import (
     IndexRequest,
     JobCreated,
     JobSnapshot,
-    OllamaModelLoadRequest,
     OllamaModelInfo,
+    OllamaModelLoadRequest,
     OllamaModelsResponse,
     OllamaStatusSchema,
     RAGQueryRequest,
@@ -55,7 +55,7 @@ async def system_status(request: Request) -> SystemStatusSchema:
         ollama=OllamaStatusSchema(
             status=state.status.value,
             detail=state.detail,
-            model=get_config().OLLAMA_LLM_MODEL,
+            model=config.OLLAMA_LLM_MODEL,
         ),
     )
 
@@ -63,8 +63,7 @@ async def system_status(request: Request) -> SystemStatusSchema:
 @router.get('/config', response_model=AppConfig)
 async def read_config() -> AppConfig:
     """Return current effective config (defaults merged with saved overrides)."""
-    cfg = get_config()
-    return AppConfig(**{k: getattr(cfg, k) for k in get_tunable_defaults().keys()})
+    return AppConfig(**{k: getattr(config, k) for k in get_tunable_defaults().keys()})
 
 
 @router.put('/config', response_model=AppConfig)
@@ -74,8 +73,7 @@ async def write_config(patch: AppConfigPatch) -> AppConfig:
     updates = patch.model_dump(exclude_unset=True, exclude_none=False)
     merged = {**existing, **updates}
     settings_store.save(merged)
-    cfg = get_config()
-    return AppConfig(**{k: getattr(cfg, k) for k in get_tunable_defaults().keys()})
+    return AppConfig(**{k: getattr(config, k) for k in get_tunable_defaults().keys()})
 
 
 @router.get('/config/defaults', response_model=AppConfig)
@@ -88,7 +86,7 @@ async def read_config_defaults() -> AppConfig:
 async def list_ollama_models(request: Request) -> OllamaModelsResponse:
     """List models available in the local Ollama instance with their loaded state."""
     client: OllamaClient = request.app.state.ollama
-    current = get_config().OLLAMA_LLM_MODEL
+    current = config.OLLAMA_LLM_MODEL
     try:
         local = await client.list_local_models()
     except OllamaError as err:
@@ -118,18 +116,16 @@ async def load_ollama_model(request: Request, body: OllamaModelLoadRequest) -> N
 @router.get('/databases', response_model=DatabasesResponse)
 async def list_databases() -> DatabasesResponse:
     """List SQLite databases under saved_data/databases/ (by stem name)."""
-    cfg = get_config()
-    cfg.DATABASES_DIR.mkdir(parents=True, exist_ok=True)
-    names = sorted(p.stem for p in cfg.DATABASES_DIR.glob('*.sqlite3'))
+    config.DATABASES_DIR.mkdir(parents=True, exist_ok=True)
+    names = sorted(p.stem for p in config.DATABASES_DIR.glob('*.sqlite3'))
     return DatabasesResponse(databases=names)
 
 
 @router.get('/categories-runs', response_model=CategoriesRunsResponse)
 async def list_categories_runs() -> CategoriesRunsResponse:
     """List timestamped category-collection runs under saved_data/categories/."""
-    cfg = get_config()
-    cfg.CATEGORIES_DIR.mkdir(parents=True, exist_ok=True)
-    runs = sorted((p.name for p in cfg.CATEGORIES_DIR.iterdir() if p.is_dir()), reverse=True)
+    config.CATEGORIES_DIR.mkdir(parents=True, exist_ok=True)
+    runs = sorted((p.name for p in config.CATEGORIES_DIR.iterdir() if p.is_dir()), reverse=True)
     return CategoriesRunsResponse(runs=runs)
 
 

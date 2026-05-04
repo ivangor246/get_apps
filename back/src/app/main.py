@@ -1,19 +1,25 @@
-import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import get_config
+from app.api.routes import router
+from app.core.lifespan import lifespan
 
 
-def main() -> None:
-    """Start the FastAPI web server; all interaction happens via the web UI."""
-    cfg = get_config()
-    uvicorn.run(
-        'app.api.app:create_app',
-        factory=True,
-        host=cfg.API_HOST,
-        port=cfg.API_PORT,
-        log_level='info',
+def create_app() -> FastAPI:
+    """Build the FastAPI app."""
+
+    app = FastAPI(
+        title='get_apps',
+        lifespan=lifespan,
     )
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=['*'],
+        allow_methods=['*'],
+        allow_headers=['*'],
+    )
 
-if __name__ == '__main__':
-    main()
+    app.include_router(router)
+
+    return app
