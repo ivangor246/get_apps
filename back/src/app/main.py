@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.core import config
 from app.core.lifespan import lifespan
 
 
@@ -11,6 +12,10 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title='get_apps',
         lifespan=lifespan,
+        debug=config.DEBUG,
+        docs_url=config.DOCS_URL,
+        openapi_url=config.OPENAPI_URL,
+        redoc_url=config.REDOC_URL,
     )
 
     app.add_middleware(

@@ -12,6 +12,22 @@ _RUSTORE_URL: str = 'https://www.rustore.ru'
 class Config:
     """Immutable runtime settings; values are fixed at process start."""
 
+    API_HOST: str = '127.0.0.1'
+    API_PORT: int = 8000
+
+    DOCS_URL: str = '/api/docs'
+    OPENAPI_URL: str = '/api/docs.json'
+    REDOC_URL: str = '/api/redoc'
+
+    DEBUG: bool = 'True'
+
+    BASE_DIR: Path = _BASE_DIR
+    DATA_DIR: Path = _DATA_DIR
+    CATEGORIES_DIR: Path = _DATA_DIR / 'categories'
+    DATABASES_DIR: Path = _DATA_DIR / 'databases'
+    CHROMA_DIR: Path = _DATA_DIR / 'chroma'
+    CACHE_DIR: Path = _BASE_DIR / 'cache_dir'
+
     OLLAMA_URL: str = 'http://localhost:11434'
     OLLAMA_LLM_MODEL: str = 'gemma3:1b'
     OLLAMA_TIMEOUT: float = 120.0
@@ -25,16 +41,6 @@ class Config:
 
     RAG_TOP_K: int = 10
     RAG_CANDIDATE_K: int = 500
-
-    API_HOST: str = '127.0.0.1'
-    API_PORT: int = 8000
-
-    BASE_DIR: Path = _BASE_DIR
-    DATA_DIR: Path = _DATA_DIR
-    CATEGORIES_DIR: Path = _DATA_DIR / 'categories'
-    DATABASES_DIR: Path = _DATA_DIR / 'databases'
-    CHROMA_DIR: Path = _DATA_DIR / 'chroma'
-    CACHE_DIR: Path = _BASE_DIR / 'cache_dir'
 
     CATEGORIES_TIMESTAMP_FORMAT: str = '%d_%m_%Y_%H_%M_%S'
 
