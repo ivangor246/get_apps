@@ -21,9 +21,11 @@ make install
 ## Модели Ollama
 
 ```bash
-ollama pull gemma3:1b
-ollama serve   # если не запущен как сервис
+ollama pull <model>   # любая модель на ваш выбор, например llama3.2:3b
+ollama serve          # если не запущен как сервис
 ```
+
+Активная LLM выбирается на фронтенде в виджете AI Model и сохраняется в localStorage браузера; бэкенд не имеет модели по умолчанию.
 
 Эмбеддинги считаются локально через `fastembed` на CPU (`intfloat/multilingual-e5-large`). Дефолты конфига живут в [back/src/app/core/config.py](back/src/app/core/config.py); фронт читает их из `GET /api/config`, тюнабельные значения редактируются в UI на странице **Settings** и хранятся в localStorage браузера, передаваясь в запросы как query-параметры.
 

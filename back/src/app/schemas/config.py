@@ -4,7 +4,6 @@ from pydantic import BaseModel
 class TunableConfigSchema(BaseModel):
     """Config values that can be overridden per-request via query parameters."""
 
-    OLLAMA_LLM_MODEL: str
     OLLAMA_TIMEOUT: float
     OLLAMA_CONTEXT_SIZE: int
     RAG_TOP_K: int

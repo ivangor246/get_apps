@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Request
 
-from app.core import config
 from app.schemas import (
     OllamaStatusSchema,
     SystemStatusSchema,
@@ -18,6 +17,5 @@ async def system_status(request: Request) -> SystemStatusSchema:
         ollama=OllamaStatusSchema(
             status=state.status.value,
             detail=state.detail,
-            model=config.OLLAMA_LLM_MODEL,
         ),
     )

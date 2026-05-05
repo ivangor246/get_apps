@@ -29,13 +29,12 @@ class Config:
     CACHE_DIR: Path = _BASE_DIR / 'cache_dir'
 
     OLLAMA_URL: str = 'http://localhost:11434'
-    OLLAMA_LLM_MODEL: str = 'gemma3:1b'
     OLLAMA_TIMEOUT: float = 120.0
     OLLAMA_CONTEXT_SIZE: int = 6144
 
     EMBEDDING_MODEL: str = 'intfloat/multilingual-e5-large'
     EMBEDDING_DIM: int = 1024
-    EMBEDDING_BATCH_SIZE: int = 8
+    EMBEDDING_BATCH_SIZE: int = 16
 
     RAG_TOP_K: int = 10
     RAG_CANDIDATE_K: int = 500

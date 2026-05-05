@@ -1,5 +1,4 @@
 export interface TunableConfig {
-  OLLAMA_LLM_MODEL: string;
   OLLAMA_TIMEOUT: number;
   OLLAMA_CONTEXT_SIZE: number;
   RAG_TOP_K: number;
@@ -18,4 +17,6 @@ export interface BackendConfig {
   read_only: ReadOnlyConfig;
 }
 
-export type ConfigOverrides = Partial<TunableConfig>;
+export type ConfigOverrides = Partial<TunableConfig> & {
+  OLLAMA_LLM_MODEL?: string;
+};

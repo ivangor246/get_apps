@@ -15,7 +15,6 @@ async def get_config() -> ConfigSchema:
     """Expose backend-owned defaults so the frontend can seed its Settings UI."""
     return ConfigSchema(
         tunable=TunableConfigSchema(
-            OLLAMA_LLM_MODEL=config.OLLAMA_LLM_MODEL,
             OLLAMA_TIMEOUT=config.OLLAMA_TIMEOUT,
             OLLAMA_CONTEXT_SIZE=config.OLLAMA_CONTEXT_SIZE,
             RAG_TOP_K=config.RAG_TOP_K,

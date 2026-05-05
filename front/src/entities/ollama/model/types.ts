@@ -5,6 +5,5 @@ export interface OllamaModelInfo {
 }
 
 export interface OllamaModelsResponse {
-  current: string;
   models: OllamaModelInfo[];
 }

@@ -14,11 +14,9 @@ class OllamaClient:
     def __init__(
         self,
         base_url: str | None = None,
-        llm_model: str | None = None,
         timeout: float | None = None,
     ):
         self._base_url = (base_url or config.OLLAMA_URL).rstrip('/')
-        self._llm_model_override = llm_model
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
             timeout=timeout or config.OLLAMA_TIMEOUT,
@@ -42,17 +40,19 @@ class OllamaClient:
     async def generate(
         self,
         prompt: str,
+        model: str,
         *,
         system: str | None = None,
         json_format: bool = False,
-        model: str | None = None,
         context_size: int | None = None,
         timeout: float | None = None,
     ) -> str:
-        """Generate a completion; per-call overrides take precedence over config defaults."""
+        """Generate a completion; the model name is supplied per call by the caller."""
+        if not model:
+            raise OllamaError('Ollama generate requires an explicit model name.')
         cfg = get_config()
         payload: dict = {
-            'model': model or self._llm_model_override or cfg.OLLAMA_LLM_MODEL,
+            'model': model,
             'prompt': prompt,
             'stream': False,
             'options': {'num_ctx': context_size or cfg.OLLAMA_CONTEXT_SIZE},

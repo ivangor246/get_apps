@@ -155,9 +155,10 @@ class RAGService:
     async def answer(
         self,
         query: str,
+        llm_model: str,
+        *,
         top_k: int | None = None,
         candidate_k: int | None = None,
-        llm_model: str | None = None,
         ollama_timeout: float | None = None,
         ollama_context_size: int | None = None,
     ) -> RAGResponse:

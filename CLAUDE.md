@@ -78,7 +78,8 @@ All Poetry/uvicorn commands run from `back/` (see `Makefile`).
 
 **Front and back are independent on configuration.** The backend owns hardcoded defaults in [back/src/app/core/config.py](back/src/app/core/config.py) and exposes them read-only via `GET /api/config`. The frontend fetches those defaults on load, lets the user edit tunable fields on the Settings page, and persists user overrides in **browser localStorage**. Each request from the frontend includes only the overrides relevant to that endpoint as **query parameters**; the backend never persists user-level config.
 
-- Tunable per-request (sent as query params): `OLLAMA_LLM_MODEL`, `OLLAMA_TIMEOUT`, `OLLAMA_CONTEXT_SIZE`, `RAG_TOP_K`, `RAG_CANDIDATE_K`, `EMBEDDING_BATCH_SIZE`.
+- Tunable per-request (sent as query params): `OLLAMA_TIMEOUT`, `OLLAMA_CONTEXT_SIZE`, `RAG_TOP_K`, `RAG_CANDIDATE_K`, `EMBEDDING_BATCH_SIZE`.
+- The Ollama LLM model has no backend default — the frontend picks one from the locally available models list and sends it on every RAG request as the `llm_model` query param.
 - Read-only (backend-startup, require code edit + restart): `OLLAMA_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`.
 - Not exposed to UI: file paths, RuStore URLs + category list, pagination count, `API_HOST`/`API_PORT`.
 

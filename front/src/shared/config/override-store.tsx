@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { ConfigOverrides, TunableConfig } from '../../entities/config';
+import type { ConfigOverrides } from '../../entities/config';
+
+type OverrideKey = keyof ConfigOverrides;
 
 interface ConfigOverridesContextValue {
   overrides: ConfigOverrides;
-  setOverride: <K extends keyof TunableConfig>(key: K, value: TunableConfig[K] | undefined) => void;
+  setOverride: <K extends OverrideKey>(key: K, value: ConfigOverrides[K] | undefined) => void;
   resetAll: () => void;
 }
 
@@ -31,7 +33,7 @@ export function ConfigOverridesProvider({ children }: { children: ReactNode }) {
   }, [overrides]);
 
   const setOverride = useCallback(
-    <K extends keyof TunableConfig>(key: K, value: TunableConfig[K] | undefined) => {
+    <K extends OverrideKey>(key: K, value: ConfigOverrides[K] | undefined) => {
       setOverrides((prev) => {
         const next = { ...prev };
         if (value === undefined) {
@@ -61,7 +63,7 @@ export function useConfigOverrides(): ConfigOverridesContextValue {
   return ctx;
 }
 
-const PARAM_NAMES: Record<keyof TunableConfig, string> = {
+const PARAM_NAMES: Record<OverrideKey, string> = {
   OLLAMA_LLM_MODEL: 'llm_model',
   OLLAMA_TIMEOUT: 'ollama_timeout',
   OLLAMA_CONTEXT_SIZE: 'ollama_context_size',
@@ -70,7 +72,7 @@ const PARAM_NAMES: Record<keyof TunableConfig, string> = {
   EMBEDDING_BATCH_SIZE: 'batch_size',
 };
 
-export function pickOverrides<K extends keyof TunableConfig>(
+export function pickOverrides<K extends OverrideKey>(
   overrides: ConfigOverrides,
   keys: readonly K[],
 ): Record<string, string | number> {

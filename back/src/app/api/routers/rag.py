@@ -19,7 +19,7 @@ async def rag_query(
     body: RAGQueryRequest,
     top_k: int | None = Query(default=None, ge=1, le=100),
     candidate_k: int | None = Query(default=None, ge=1, le=10000),
-    llm_model: str | None = Query(default=None, min_length=1),
+    llm_model: str = Query(min_length=1),
     ollama_timeout: float | None = Query(default=None, gt=0),
     ollama_context_size: int | None = Query(default=None, ge=1),
 ) -> RAGQueryResponse:
@@ -27,9 +27,9 @@ async def rag_query(
     service: RAGService = await request.app.state.get_rag_service(body.db_name)
     response = await service.answer(
         body.query,
+        llm_model,
         top_k=top_k,
         candidate_k=candidate_k,
-        llm_model=llm_model,
         ollama_timeout=ollama_timeout,
         ollama_context_size=ollama_context_size,
     )

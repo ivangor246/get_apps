@@ -21,8 +21,7 @@ export function ModelPicker() {
   const loadMutation = useLoadOllamaModel();
 
   const data = modelsQ.data;
-  const backendDefault = data?.current ?? configQ.data?.tunable.OLLAMA_LLM_MODEL ?? '';
-  const current = overrides.OLLAMA_LLM_MODEL ?? backendDefault;
+  const current = overrides.OLLAMA_LLM_MODEL ?? '';
   const models = data?.models ?? [];
   const currentInfo = models.find((m) => m.name === current);
   const downloadedCount = models.filter((m) => m.downloaded).length;
@@ -50,11 +49,7 @@ export function ModelPicker() {
 
   const handleSelect = (value: string) => {
     if (value === current) return;
-    if (value === backendDefault) {
-      setOverride('OLLAMA_LLM_MODEL', undefined);
-    } else {
-      setOverride('OLLAMA_LLM_MODEL', value);
-    }
+    setOverride('OLLAMA_LLM_MODEL', value || undefined);
   };
 
   const commitContext = () => {
@@ -85,8 +80,6 @@ export function ModelPicker() {
     }
   };
 
-  const isModelOverridden = overrides.OLLAMA_LLM_MODEL !== undefined;
-
   return (
     <Box sx={{ mb: 4, maxWidth: 720 }}>
       <Box sx={{ typography: 'overline', color: 'text.secondary', mb: 1 }}>AI Model</Box>
@@ -107,7 +100,7 @@ export function ModelPicker() {
               onChange={(e) => handleSelect(e.target.value)}
               disabled={models.length === 0}
               sx={{ minWidth: 320 }}
-              helperText={isModelOverridden ? `Override (default: ${backendDefault})` : undefined}
+              helperText="Pick a locally available model."
             >
               {models.length === 0 ? (
                 <MenuItem value="" disabled>

@@ -6,7 +6,6 @@ class OllamaStatusSchema(BaseModel):
 
     status: str
     detail: str | None = None
-    model: str | None = None
 
 
 class OllamaModelInfo(BaseModel):
@@ -18,9 +17,8 @@ class OllamaModelInfo(BaseModel):
 
 
 class OllamaModelsResponse(BaseModel):
-    """Listing of locally available Ollama models plus the currently configured choice."""
+    """Listing of locally available Ollama models."""
 
-    current: str
     models: list[OllamaModelInfo]
 
 
