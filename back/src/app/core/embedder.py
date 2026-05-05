@@ -22,10 +22,12 @@ def _preload_nvidia_libs() -> None:
     them under site-packages/nvidia/*/lib/. We load them globally here so the CUDA
     execution provider can resolve its dependencies without LD_LIBRARY_PATH.
     """
+
     try:
         import nvidia  # type: ignore[import-not-found]
     except ImportError:
         return
+
     roots = [Path(p) for p in nvidia.__path__]
     load_order = ('cuda_runtime', 'cublas', 'cudnn')
     for name in load_order:
@@ -33,6 +35,7 @@ def _preload_nvidia_libs() -> None:
             lib_dir = root / name / 'lib'
             if not lib_dir.is_dir():
                 continue
+
             for so in sorted(lib_dir.glob('lib*.so*')):
                 try:
                     ctypes.CDLL(str(so), mode=ctypes.RTLD_GLOBAL)
@@ -70,7 +73,9 @@ class TextEmbedder:
         config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
         logger.info(
             'Loading embedding model %s (providers=%s, cache_dir=%s)',
-            self._model_name, providers, self._cache_dir,
+            self._model_name,
+            providers,
+            self._cache_dir,
         )
         self._model = TextEmbedding(
             model_name=self._model_name,
@@ -78,30 +83,42 @@ class TextEmbedder:
             providers=providers,
         )
 
-    async def embed_passages(self, texts: list[str], batch_size: int | None = None) -> list[list[float]]:
+    async def embed_passages(
+        self,
+        texts: list[str],
+        batch_size: int | None = None,
+    ) -> list[list[float]]:
         """Encode indexable documents with the e5 ``passage:`` prefix."""
+
         if not texts:
             return []
         prefixed = [f'{self._PASSAGE_PREFIX}{t}' for t in texts]
         gpu_batch = batch_size or config.EMBEDDING_BATCH_SIZE
+
         return await asyncio.to_thread(self._encode_sync, prefixed, gpu_batch)
 
     async def embed_query(self, text_value: str) -> list[float]:
         """Encode a single search query with the e5 ``query:`` prefix."""
+
         prefixed = [f'{self._QUERY_PREFIX}{text_value}']
         vectors = await asyncio.to_thread(self._encode_sync, prefixed, 1)
         return vectors[0]
 
     def _encode_sync(self, texts: list[str], batch_size: int) -> list[list[float]]:
+        """Run the blocking fastembed encode call and materialize results as plain lists."""
+
         vectors = list(self._model.embed(texts, batch_size=batch_size))
         return [vec.tolist() for vec in vectors]
 
     @staticmethod
     def _providers_for(device: str) -> list:
+        """Build the onnxruntime provider list for the requested device (cuda or cpu)."""
+
         if device.lower() == 'cuda':
             cuda_options = {
                 'arena_extend_strategy': 'kSameAsRequested',
                 'gpu_mem_limit': config.EMBEDDING_GPU_MEM_LIMIT_MB * 1024 * 1024,
             }
             return [('CUDAExecutionProvider', cuda_options), 'CPUExecutionProvider']
+
         return ['CPUExecutionProvider']
