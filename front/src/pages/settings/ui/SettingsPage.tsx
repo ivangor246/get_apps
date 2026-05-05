@@ -19,13 +19,11 @@ export function SettingsPage() {
 
       <Divider sx={{ mb: 4 }} />
 
-      <ModelPicker />
-
-      <Divider sx={{ mb: 4 }} />
-
       <Typography variant="h6" gutterBottom>
         Runtime configuration
       </Typography>
+
+      <ModelPicker />
 
       <ConfigForm />
     </>

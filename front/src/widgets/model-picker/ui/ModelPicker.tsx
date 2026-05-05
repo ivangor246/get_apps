@@ -41,6 +41,13 @@ export function ModelPicker() {
     if (effectiveCtx > 0) setCtxInput(String(effectiveCtx));
   }, [effectiveCtx]);
 
+  const defaultTimeout = configQ.data?.tunable.OLLAMA_TIMEOUT ?? 0;
+  const effectiveTimeout = overrides.OLLAMA_TIMEOUT ?? defaultTimeout;
+  const [timeoutInput, setTimeoutInput] = useState<string>('');
+  useEffect(() => {
+    if (effectiveTimeout > 0) setTimeoutInput(String(effectiveTimeout));
+  }, [effectiveTimeout]);
+
   const handleSelect = (value: string) => {
     if (value === current) return;
     if (value === backendDefault) {
@@ -61,6 +68,20 @@ export function ModelPicker() {
       setOverride('OLLAMA_CONTEXT_SIZE', undefined);
     } else {
       setOverride('OLLAMA_CONTEXT_SIZE', rounded);
+    }
+  };
+
+  const commitTimeout = () => {
+    const parsed = Number(timeoutInput);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setTimeoutInput(String(effectiveTimeout));
+      return;
+    }
+    const rounded = Math.floor(parsed);
+    if (rounded === defaultTimeout) {
+      setOverride('OLLAMA_TIMEOUT', undefined);
+    } else {
+      setOverride('OLLAMA_TIMEOUT', rounded);
     }
   };
 
@@ -127,24 +148,44 @@ export function ModelPicker() {
             </Button>
           </Stack>
 
-          <TextField
-            label="Context size (tokens)"
-            type="number"
-            value={ctxInput}
-            onChange={(e) => setCtxInput(e.target.value)}
-            onBlur={commitContext}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                (e.target as HTMLInputElement).blur();
-              }
-            }}
-            disabled={configQ.isLoading}
-            size="small"
-            inputProps={{ min: 1, step: 256 }}
-            helperText={`Default: ${defaultCtx}. Sent with each RAG request.`}
-            sx={{ minWidth: 240, mt: 1, mb: 1 }}
-          />
+          <Stack direction="row" spacing={2} sx={{ mt: 1, mb: 1, flexWrap: 'wrap' }}>
+            <TextField
+              label="Context size (tokens)"
+              type="number"
+              value={ctxInput}
+              onChange={(e) => setCtxInput(e.target.value)}
+              onBlur={commitContext}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              disabled={configQ.isLoading}
+              size="small"
+              inputProps={{ min: 1, step: 256 }}
+              helperText="Maximum number of tokens the model can process in a single request."
+              sx={{ minWidth: 240 }}
+            />
+            <TextField
+              label="Timeout (s)"
+              type="number"
+              value={timeoutInput}
+              onChange={(e) => setTimeoutInput(e.target.value)}
+              onBlur={commitTimeout}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              disabled={configQ.isLoading}
+              size="small"
+              inputProps={{ min: 1, step: 1 }}
+              helperText="Maximum time in seconds to wait for a model response."
+              sx={{ minWidth: 240 }}
+            />
+          </Stack>
 
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             Status: {status} · {downloadedCount} local model{downloadedCount === 1 ? '' : 's'}

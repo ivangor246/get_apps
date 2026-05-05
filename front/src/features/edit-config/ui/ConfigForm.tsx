@@ -18,33 +18,11 @@ type TunableSpec = {
   key: keyof TunableConfig;
   label: string;
   type: 'text' | 'number';
-  group: 'Ollama' | 'RAG' | 'Embedding';
+  group: 'RAG' | 'Embedding';
   description: string;
 };
 
 const TUNABLE_FIELDS: TunableSpec[] = [
-  {
-    key: 'OLLAMA_LLM_MODEL',
-    label: 'LLM model',
-    type: 'text',
-    group: 'Ollama',
-    description: 'Name of the language model used to generate answers.',
-  },
-  {
-    key: 'OLLAMA_TIMEOUT',
-    label: 'Timeout (s)',
-    type: 'number',
-    group: 'Ollama',
-    description: 'Maximum time in seconds to wait for a model response.',
-  },
-  {
-    key: 'OLLAMA_CONTEXT_SIZE',
-    label: 'Context size',
-    type: 'number',
-    group: 'Ollama',
-    description: 'Maximum number of tokens the model can process in a single request.',
-  },
-
   {
     key: 'RAG_TOP_K',
     label: 'Top K',
@@ -69,7 +47,7 @@ const TUNABLE_FIELDS: TunableSpec[] = [
   },
 ];
 
-const TUNABLE_GROUPS: TunableSpec['group'][] = ['Ollama', 'RAG', 'Embedding'];
+const TUNABLE_GROUPS: TunableSpec['group'][] = ['RAG', 'Embedding'];
 
 const READ_ONLY_FIELDS: { key: keyof ReadOnlyConfig; label: string; description: string }[] = [
   {
