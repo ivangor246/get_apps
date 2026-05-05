@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from app.core import config
 from app.core.jobs import JobManager
 from app.schemas import (
     CollectAppsRequest,
@@ -47,12 +48,18 @@ async def start_collect_apps(request: Request, body: CollectAppsRequest) -> JobC
 
 
 @router.post('/index', response_model=JobCreated)
-async def start_index(request: Request, body: IndexRequest) -> JobCreated:
+async def start_index(
+    request: Request,
+    body: IndexRequest,
+    batch_size: int | None = Query(default=None, ge=1, le=1024),
+) -> JobCreated:
+    effective_batch_size = batch_size or config.EMBEDDING_BATCH_SIZE
+
     async def work(handle):
-        handle.log(f'Indexing db={body.db_name} batch_size={body.batch_size}')
+        handle.log(f'Indexing db={body.db_name} batch_size={effective_batch_size}')
         await run_index_task(
             db_name=body.db_name,
-            batch_size=body.batch_size,
+            batch_size=effective_batch_size,
             concurrency=body.concurrency,
         )
         handle.log('Done.')

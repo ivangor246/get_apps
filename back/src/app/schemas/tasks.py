@@ -16,8 +16,7 @@ class CollectAppsRequest(BaseModel):
 
 
 class IndexRequest(BaseModel):
-    """Body for POST /tasks/index: which DB to embed and batching/concurrency knobs."""
+    """Body for POST /tasks/index: which DB to embed and concurrency knob."""
 
     db_name: str = Field(..., min_length=1)
-    batch_size: int = Field(default=32, ge=1, le=1024)
     concurrency: int = Field(default=1, ge=1, le=16)
