@@ -19,27 +19,84 @@ type TunableSpec = {
   label: string;
   type: 'text' | 'number';
   group: 'Ollama' | 'RAG' | 'Embedding';
+  description: string;
 };
 
 const TUNABLE_FIELDS: TunableSpec[] = [
-  { key: 'OLLAMA_LLM_MODEL', label: 'LLM model', type: 'text', group: 'Ollama' },
-  { key: 'OLLAMA_TIMEOUT', label: 'Timeout (s)', type: 'number', group: 'Ollama' },
-  { key: 'OLLAMA_CONTEXT_SIZE', label: 'Context size', type: 'number', group: 'Ollama' },
+  {
+    key: 'OLLAMA_LLM_MODEL',
+    label: 'LLM model',
+    type: 'text',
+    group: 'Ollama',
+    description: 'Name of the language model used to generate answers.',
+  },
+  {
+    key: 'OLLAMA_TIMEOUT',
+    label: 'Timeout (s)',
+    type: 'number',
+    group: 'Ollama',
+    description: 'Maximum time in seconds to wait for a model response.',
+  },
+  {
+    key: 'OLLAMA_CONTEXT_SIZE',
+    label: 'Context size',
+    type: 'number',
+    group: 'Ollama',
+    description: 'Maximum number of tokens the model can process in a single request.',
+  },
 
-  { key: 'RAG_TOP_K', label: 'Top K', type: 'number', group: 'RAG' },
-  { key: 'RAG_CANDIDATE_K', label: 'Candidate K', type: 'number', group: 'RAG' },
+  {
+    key: 'RAG_TOP_K',
+    label: 'Top K',
+    type: 'number',
+    group: 'RAG',
+    description: 'Number of most relevant documents passed to the model as context.',
+  },
+  {
+    key: 'RAG_CANDIDATE_K',
+    label: 'Candidate K',
+    type: 'number',
+    group: 'RAG',
+    description: 'Number of initial candidates retrieved from the vector store before re-ranking.',
+  },
 
-  { key: 'EMBEDDING_BATCH_SIZE', label: 'Batch size', type: 'number', group: 'Embedding' },
+  {
+    key: 'EMBEDDING_BATCH_SIZE',
+    label: 'Batch size',
+    type: 'number',
+    group: 'Embedding',
+    description: 'Number of texts encoded into vectors in one batch during indexing.',
+  },
 ];
 
 const TUNABLE_GROUPS: TunableSpec['group'][] = ['Ollama', 'RAG', 'Embedding'];
 
-const READ_ONLY_FIELDS: { key: keyof ReadOnlyConfig; label: string }[] = [
-  { key: 'OLLAMA_URL', label: 'Ollama URL' },
-  { key: 'EMBEDDING_MODEL', label: 'Embedding model' },
-  { key: 'EMBEDDING_DEVICE', label: 'Device' },
-  { key: 'EMBEDDING_DIM', label: 'Embedding dim' },
-  { key: 'EMBEDDING_GPU_MEM_LIMIT_MB', label: 'GPU mem limit (MB)' },
+const READ_ONLY_FIELDS: { key: keyof ReadOnlyConfig; label: string; description: string }[] = [
+  {
+    key: 'OLLAMA_URL',
+    label: 'Ollama URL',
+    description: 'Address of the language model service.',
+  },
+  {
+    key: 'EMBEDDING_MODEL',
+    label: 'Embedding model',
+    description: 'Model used to convert texts into vector representations.',
+  },
+  {
+    key: 'EMBEDDING_DEVICE',
+    label: 'Device',
+    description: 'Hardware used to compute embeddings (CPU or GPU).',
+  },
+  {
+    key: 'EMBEDDING_DIM',
+    label: 'Embedding dim',
+    description: 'Length of the vector produced by the embedding model.',
+  },
+  {
+    key: 'EMBEDDING_GPU_MEM_LIMIT_MB',
+    label: 'GPU mem limit (MB)',
+    description: 'Maximum amount of GPU memory in megabytes the embedding model may use.',
+  },
 ];
 
 function parseValue(spec: TunableSpec, raw: string): TunableConfig[typeof spec.key] | undefined {
@@ -89,7 +146,7 @@ export function ConfigForm() {
                       setOverride(f.key, parsed);
                     }
                   }}
-                  helperText={`Default: ${defaultValue}`}
+                  helperText={f.description}
                   InputProps={{
                     endAdornment: isOverridden ? (
                       <InputAdornment position="end">
@@ -111,7 +168,7 @@ export function ConfigForm() {
       ))}
 
       <Box sx={{ mb: 3 }}>
-        <Box sx={{ typography: 'overline', color: 'text.secondary', mb: 1 }}>Read-only (backend startup)</Box>
+        <Box sx={{ typography: 'overline', color: 'text.secondary', mb: 1 }}>Read-only</Box>
         <Stack spacing={2}>
           {READ_ONLY_FIELDS.map((f) => (
             <TextField
@@ -120,7 +177,7 @@ export function ConfigForm() {
               value={String(read_only[f.key])}
               fullWidth
               disabled
-              helperText="Set in back/src/app/core/config.py; restart required"
+              helperText={f.description}
             />
           ))}
         </Stack>

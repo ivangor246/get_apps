@@ -26,11 +26,6 @@ export function SettingsPage() {
       <Typography variant="h6" gutterBottom>
         Runtime configuration
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Tunable settings live in your browser (localStorage) and travel with each request as query
-        parameters. Read-only fields show backend defaults — change them in{' '}
-        <code>back/src/app/core/config.py</code> and restart the backend.
-      </Typography>
 
       <ConfigForm />
     </>
