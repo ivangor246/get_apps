@@ -19,7 +19,7 @@ class Config:
     OPENAPI_URL: str = '/api/docs.json'
     REDOC_URL: str = '/api/redoc'
 
-    DEBUG: bool = 'True'
+    DEBUG: bool = True
 
     BASE_DIR: Path = _BASE_DIR
     DATA_DIR: Path = _DATA_DIR
