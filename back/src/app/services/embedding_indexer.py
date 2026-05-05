@@ -9,8 +9,13 @@ from chromadb.api.models.Collection import Collection
 from sqlalchemy import bindparam, text
 
 from app.core import TextEmbedder
-from app.core.chroma import build_chroma_client, get_app_collection
-from app.core.db import build_engine, build_sessionmaker, init_db
+from app.core.storage import (
+    build_chroma_client,
+    build_engine,
+    build_sessionmaker,
+    get_app_collection,
+    init_db,
+)
 
 logger = logging.getLogger(__name__)
 

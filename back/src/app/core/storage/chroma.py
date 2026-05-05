@@ -5,7 +5,7 @@ from chromadb.api import ClientAPI
 from chromadb.api.models.Collection import Collection
 from chromadb.config import Settings
 
-from .config import config
+from ..config import config
 
 logging.getLogger('chromadb.telemetry.product.posthog').setLevel(logging.CRITICAL)
 

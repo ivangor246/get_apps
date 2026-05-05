@@ -4,7 +4,7 @@ import logging
 from playwright.async_api import async_playwright
 from sqlalchemy import select
 
-from app.core.db import build_engine, build_sessionmaker, init_db
+from app.core.storage import build_engine, build_sessionmaker, init_db
 from app.models import AppInfo
 
 from .category_loader import CategoryLoader

@@ -4,8 +4,13 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 
 from app.core import OllamaClient, TextEmbedder
-from app.core.chroma import build_chroma_client, get_app_collection
-from app.core.db import build_engine, build_sessionmaker, init_db
+from app.core.storage import (
+    build_chroma_client,
+    build_engine,
+    build_sessionmaker,
+    get_app_collection,
+    init_db,
+)
 from app.core.jobs import JobManager
 from app.core.ollama import OllamaRuntime
 from app.services import RAGService
