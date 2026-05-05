@@ -88,7 +88,7 @@ export function ModelPicker() {
   const isModelOverridden = overrides.OLLAMA_LLM_MODEL !== undefined;
 
   return (
-    <Box sx={{ mb: 4 }}>
+    <Box sx={{ mb: 4, maxWidth: 720 }}>
       <Box sx={{ typography: 'overline', color: 'text.secondary', mb: 1 }}>AI Model</Box>
 
       {modelsQ.isLoading ? (
@@ -99,7 +99,7 @@ export function ModelPicker() {
         </Alert>
       ) : (
         <>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', mb: 1 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
             <TextField
               select
               label="Active model"
@@ -107,7 +107,7 @@ export function ModelPicker() {
               onChange={(e) => handleSelect(e.target.value)}
               disabled={models.length === 0}
               sx={{ minWidth: 320 }}
-              helperText={isModelOverridden ? `Override (default: ${backendDefault})` : ' '}
+              helperText={isModelOverridden ? `Override (default: ${backendDefault})` : undefined}
             >
               {models.length === 0 ? (
                 <MenuItem value="" disabled>
@@ -148,7 +148,15 @@ export function ModelPicker() {
             </Button>
           </Stack>
 
-          <Stack direction="row" spacing={2} sx={{ mt: 1, mb: 1, flexWrap: 'wrap' }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', mt: 0.5, mb: 3 }}
+          >
+            Status: {status} · {downloadedCount} local model{downloadedCount === 1 ? '' : 's'}
+          </Typography>
+
+          <Stack spacing={2} sx={{ mb: 1 }}>
             <TextField
               label="Context size (tokens)"
               type="number"
@@ -162,10 +170,9 @@ export function ModelPicker() {
                 }
               }}
               disabled={configQ.isLoading}
-              size="small"
+              fullWidth
               inputProps={{ min: 1, step: 256 }}
               helperText="Maximum number of tokens the model can process in a single request."
-              sx={{ minWidth: 240 }}
             />
             <TextField
               label="Timeout (s)"
@@ -180,16 +187,11 @@ export function ModelPicker() {
                 }
               }}
               disabled={configQ.isLoading}
-              size="small"
+              fullWidth
               inputProps={{ min: 1, step: 1 }}
               helperText="Maximum time in seconds to wait for a model response."
-              sx={{ minWidth: 240 }}
             />
           </Stack>
-
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-            Status: {status} · {downloadedCount} local model{downloadedCount === 1 ? '' : 's'}
-          </Typography>
 
           {loadMutation.error ? (
             <Alert severity="error" sx={{ mt: 2 }}>
