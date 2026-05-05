@@ -45,20 +45,23 @@ class OllamaClient:
         *,
         system: str | None = None,
         json_format: bool = False,
+        model: str | None = None,
+        context_size: int | None = None,
+        timeout: float | None = None,
     ) -> str:
-        """Generate a completion; set json_format=True to force JSON output."""
+        """Generate a completion; per-call overrides take precedence over config defaults."""
         cfg = get_config()
         payload: dict = {
-            'model': self._llm_model_override or cfg.OLLAMA_LLM_MODEL,
+            'model': model or self._llm_model_override or cfg.OLLAMA_LLM_MODEL,
             'prompt': prompt,
             'stream': False,
-            'options': {'num_ctx': cfg.OLLAMA_CONTEXT_SIZE},
+            'options': {'num_ctx': context_size or cfg.OLLAMA_CONTEXT_SIZE},
         }
         if system is not None:
             payload['system'] = system
         if json_format:
             payload['format'] = 'json'
-        data = await self._post_json('/api/generate', payload)
+        data = await self._post_json('/api/generate', payload, timeout=timeout)
         response = data.get('response')
         if not isinstance(response, str):
             raise OllamaError(f'Unexpected generate response: {data!r}')
@@ -96,9 +99,12 @@ class OllamaClient:
             raise OllamaHTTPError(response.status_code, endpoint, response.text)
         return response.json()
 
-    async def _post_json(self, endpoint: str, payload: dict) -> dict:
+    async def _post_json(self, endpoint: str, payload: dict, *, timeout: float | None = None) -> dict:
         try:
-            response = await self._client.post(endpoint, json=payload)
+            kwargs: dict = {'json': payload}
+            if timeout is not None:
+                kwargs['timeout'] = timeout
+            response = await self._client.post(endpoint, **kwargs)
         except httpx.HTTPError as err:
             raise OllamaError(f'Ollama request failed: {type(err).__name__}: {err}') from err
         if response.status_code >= 400:

@@ -56,16 +56,18 @@ class RetrievalService:
         query_text: str,
         filters: FilterSpec,
         top_k: int | None = None,
+        candidate_k: int | None = None,
     ) -> list[RetrievedApp]:
         """Embed the query, run oversampled kNN in Chroma, filter via SQL with relax-fallback, return top_k."""
 
         top_k = top_k or config.RAG_TOP_K
+        candidate_k = candidate_k or config.RAG_CANDIDATE_K
         query_vector = await self._embedder.embed_query(query_text)
 
         knn = await asyncio.to_thread(
             self._collection.query,
             query_embeddings=[query_vector],
-            n_results=config.RAG_CANDIDATE_K,
+            n_results=candidate_k,
         )
         candidate_ids: list[str] = knn['ids'][0] if knn.get('ids') else []
         distances: list[float] = knn['distances'][0] if knn.get('distances') else []

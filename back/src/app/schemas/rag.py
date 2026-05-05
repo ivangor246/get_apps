@@ -6,7 +6,6 @@ class RAGQueryRequest(BaseModel):
 
     db_name: str = Field(..., min_length=1)
     query: str = Field(..., min_length=1)
-    top_k: int | None = Field(default=None, ge=1, le=100)
 
 
 class SourceApp(BaseModel):

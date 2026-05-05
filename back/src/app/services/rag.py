@@ -156,10 +156,20 @@ class RAGService:
         self,
         query: str,
         top_k: int | None = None,
+        candidate_k: int | None = None,
+        llm_model: str | None = None,
+        ollama_timeout: float | None = None,
+        ollama_context_size: int | None = None,
     ) -> RAGResponse:
         """Run the full RAG pipeline: analyze → retrieve → critique (with optional retry) → answer."""
 
-        analysis = await self._analyze(query)
+        llm_overrides = {
+            'model': llm_model,
+            'context_size': ollama_context_size,
+            'timeout': ollama_timeout,
+        }
+
+        analysis = await self._analyze(query, llm_overrides)
         logger.info(
             'analyze: intent=%s language=%s filters=%s search_query=%r',
             analysis.intent,
@@ -180,7 +190,12 @@ class RAGService:
 
         effective_top_k = top_k or analysis.filters.requested_count
         search_query = analysis.search_query or query
-        sources = await self._retrieval.search(search_query, analysis.filters, top_k=effective_top_k)
+        sources = await self._retrieval.search(
+            search_query,
+            analysis.filters,
+            top_k=effective_top_k,
+            candidate_k=candidate_k,
+        )
         sources, iterations = await self._refine_via_critique(
             query,
             analysis.language,
@@ -188,8 +203,10 @@ class RAGService:
             search_query,
             sources,
             effective_top_k,
+            candidate_k,
+            llm_overrides,
         )
-        answer_text = await self._generate_answer(query, analysis.language, sources)
+        answer_text = await self._generate_answer(query, analysis.language, sources, llm_overrides)
 
         return RAGResponse(
             answer=answer_text,
@@ -208,10 +225,12 @@ class RAGService:
         search_query: str,
         sources: list[RetrievedApp],
         top_k: int | None,
+        candidate_k: int | None,
+        llm_overrides: dict,
     ) -> tuple[list[RetrievedApp], int]:
         """Apply at most one critique pass + one retrieval retry; return surviving sources and retrieval iteration count."""
 
-        decision = await self._critique(query, language, sources)
+        decision = await self._critique(query, language, sources, llm_overrides)
         logger.info(
             'critique 1: kept %d/%d revised=%r',
             len(decision.keep_indices),
@@ -226,8 +245,13 @@ class RAGService:
         if not decision.revised_search_query or decision.revised_search_query == search_query:
             return sources, 1
 
-        retry_sources = await self._retrieval.search(decision.revised_search_query, filters, top_k=top_k)
-        retry_decision = await self._critique(query, language, retry_sources)
+        retry_sources = await self._retrieval.search(
+            decision.revised_search_query,
+            filters,
+            top_k=top_k,
+            candidate_k=candidate_k,
+        )
+        retry_decision = await self._critique(query, language, retry_sources, llm_overrides)
         logger.info(
             'critique 2: kept %d/%d',
             len(retry_decision.keep_indices),
@@ -239,7 +263,7 @@ class RAGService:
 
         return retry_sources, 2
 
-    async def _analyze(self, query: str) -> QueryAnalysis:
+    async def _analyze(self, query: str, llm_overrides: dict) -> QueryAnalysis:
         """Single LLM call producing intent, language, HyDE search query, filters, and an optional smalltalk reply."""
 
         try:
@@ -247,6 +271,7 @@ class RAGService:
                 prompt=f'User query: {query}',
                 system=_ANALYZE_SYSTEM_PROMPT,
                 json_format=True,
+                **llm_overrides,
             )
         except Exception:
             logger.exception('analyze failed; falling back to defaults')
@@ -268,6 +293,7 @@ class RAGService:
         query: str,
         language: str,
         sources: list[RetrievedApp],
+        llm_overrides: dict,
     ) -> CritiqueDecision:
         """Single LLM call that judges retrieved sources and may suggest a rewritten search query."""
 
@@ -282,6 +308,7 @@ class RAGService:
                 prompt=prompt,
                 system=_CRITIQUE_SYSTEM_PROMPT,
                 json_format=True,
+                **llm_overrides,
             )
         except Exception:
             logger.exception('critique failed; keeping all sources')
@@ -316,6 +343,7 @@ class RAGService:
         query: str,
         language: str,
         sources: list[RetrievedApp],
+        llm_overrides: dict,
     ) -> str:
         """Render the source context and call the LLM with a hard language pin."""
 
@@ -330,7 +358,7 @@ class RAGService:
             f'Provide a thorough answer in the requested language.'
         )
 
-        return await self._client.generate(prompt=prompt, system=_ANSWER_SYSTEM_PROMPT)
+        return await self._client.generate(prompt=prompt, system=_ANSWER_SYSTEM_PROMPT, **llm_overrides)
 
     @staticmethod
     def _format_context(sources: list[RetrievedApp]) -> str:
