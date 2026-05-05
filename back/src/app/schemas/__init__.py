@@ -1,3 +1,8 @@
+from .config import (
+    ConfigSchema,
+    ReadOnlyConfigSchema,
+    TunableConfigSchema,
+)
 from .jobs import (
     JobCreated,
     JobSnapshot,
@@ -30,6 +35,7 @@ __all__ = [
     'CategoriesRunsResponse',
     'CollectAppsRequest',
     'CollectCategoriesRequest',
+    'ConfigSchema',
     'DatabasesResponse',
     'IndexRequest',
     'JobCreated',
@@ -40,6 +46,8 @@ __all__ = [
     'OllamaStatusSchema',
     'RAGQueryRequest',
     'RAGQueryResponse',
+    'ReadOnlyConfigSchema',
     'SourceApp',
     'SystemStatusSchema',
+    'TunableConfigSchema',
 ]
