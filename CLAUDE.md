@@ -20,7 +20,7 @@ All three are exposed as HTTP endpoints; there is no CLI. Long-running work runs
 - **BeautifulSoup + lxml** — HTML parsing
 - **SQLAlchemy (async) + aiosqlite** — ORM over SQLite
 - **ChromaDB** — local persistent vector store
-- **fastembed-gpu** — ONNX embeddings (`intfloat/multilingual-e5-large` by default)
+- **fastembed** — ONNX embeddings on CPU (`intfloat/multilingual-e5-large` by default)
 - **Ollama** — LLM calls (via `httpx`)
 - **Poetry** — dependency management
 - **Ruff** — linting/formatting
@@ -79,7 +79,7 @@ All Poetry/uvicorn commands run from `back/` (see `Makefile`).
 **Front and back are independent on configuration.** The backend owns hardcoded defaults in [back/src/app/core/config.py](back/src/app/core/config.py) and exposes them read-only via `GET /api/config`. The frontend fetches those defaults on load, lets the user edit tunable fields on the Settings page, and persists user overrides in **browser localStorage**. Each request from the frontend includes only the overrides relevant to that endpoint as **query parameters**; the backend never persists user-level config.
 
 - Tunable per-request (sent as query params): `OLLAMA_LLM_MODEL`, `OLLAMA_TIMEOUT`, `OLLAMA_CONTEXT_SIZE`, `RAG_TOP_K`, `RAG_CANDIDATE_K`, `EMBEDDING_BATCH_SIZE`.
-- Read-only (backend-startup, require code edit + restart): `OLLAMA_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DEVICE`, `EMBEDDING_DIM`, `EMBEDDING_GPU_MEM_LIMIT_MB`.
+- Read-only (backend-startup, require code edit + restart): `OLLAMA_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`.
 - Not exposed to UI: file paths, RuStore URLs + category list, pagination count, `API_HOST`/`API_PORT`.
 
 ## Background Jobs & SSE

@@ -10,9 +10,7 @@ export interface TunableConfig {
 export interface ReadOnlyConfig {
   OLLAMA_URL: string;
   EMBEDDING_MODEL: string;
-  EMBEDDING_DEVICE: string;
   EMBEDDING_DIM: number;
-  EMBEDDING_GPU_MEM_LIMIT_MB: number;
 }
 
 export interface BackendConfig {

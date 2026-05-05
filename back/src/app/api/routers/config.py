@@ -25,8 +25,6 @@ async def get_config() -> ConfigSchema:
         read_only=ReadOnlyConfigSchema(
             OLLAMA_URL=config.OLLAMA_URL,
             EMBEDDING_MODEL=config.EMBEDDING_MODEL,
-            EMBEDDING_DEVICE=config.EMBEDDING_DEVICE,
             EMBEDDING_DIM=config.EMBEDDING_DIM,
-            EMBEDDING_GPU_MEM_LIMIT_MB=config.EMBEDDING_GPU_MEM_LIMIT_MB,
         ),
     )

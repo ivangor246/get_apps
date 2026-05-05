@@ -25,7 +25,7 @@ ollama pull gemma3:1b
 ollama serve   # если не запущен как сервис
 ```
 
-Эмбеддинги считаются локально через `fastembed-gpu` (`intfloat/multilingual-e5-large`). Дефолты конфига живут в [back/src/app/core/config.py](back/src/app/core/config.py); фронт читает их из `GET /api/config`, тюнабельные значения редактируются в UI на странице **Settings** и хранятся в localStorage браузера, передаваясь в запросы как query-параметры.
+Эмбеддинги считаются локально через `fastembed` на CPU (`intfloat/multilingual-e5-large`). Дефолты конфига живут в [back/src/app/core/config.py](back/src/app/core/config.py); фронт читает их из `GET /api/config`, тюнабельные значения редактируются в UI на странице **Settings** и хранятся в localStorage браузера, передаваясь в запросы как query-параметры.
 
 ## Запуск
 

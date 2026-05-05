@@ -61,19 +61,9 @@ const READ_ONLY_FIELDS: { key: keyof ReadOnlyConfig; label: string; description:
     description: 'Model used to convert texts into vector representations.',
   },
   {
-    key: 'EMBEDDING_DEVICE',
-    label: 'Device',
-    description: 'Hardware used to compute embeddings (CPU or GPU).',
-  },
-  {
     key: 'EMBEDDING_DIM',
     label: 'Embedding dim',
     description: 'Length of the vector produced by the embedding model.',
-  },
-  {
-    key: 'EMBEDDING_GPU_MEM_LIMIT_MB',
-    label: 'GPU mem limit (MB)',
-    description: 'Maximum amount of GPU memory in megabytes the embedding model may use.',
   },
 ];
 

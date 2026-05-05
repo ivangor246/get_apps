@@ -17,9 +17,7 @@ class ReadOnlyConfigSchema(BaseModel):
 
     OLLAMA_URL: str
     EMBEDDING_MODEL: str
-    EMBEDDING_DEVICE: str
     EMBEDDING_DIM: int
-    EMBEDDING_GPU_MEM_LIMIT_MB: int
 
 
 class ConfigSchema(BaseModel):
