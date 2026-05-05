@@ -27,8 +27,9 @@ export function SettingsPage() {
         Runtime configuration
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Overrides persist to <code>saved_data/config.json</code>. A backend restart is required for
-        values used at startup (embedder, Ollama URL) to take effect.
+        Tunable settings live in your browser (localStorage) and travel with each request as query
+        parameters. Read-only fields show backend defaults — change them in{' '}
+        <code>back/src/app/core/config.py</code> and restart the backend.
       </Typography>
 
       <ConfigForm />

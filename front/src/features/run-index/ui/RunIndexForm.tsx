@@ -4,10 +4,11 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { DbSelector } from '../../../widgets/db-selector';
 import { useStartJob } from '../../../entities/job';
+import { useBackendConfig } from '../../../entities/config';
+import { pickOverrides, useConfigOverrides } from '../../../shared/config';
 
 interface Body {
   db_name: string;
-  batch_size: number;
   concurrency: number;
 }
 
@@ -15,11 +16,16 @@ interface Props {
   onStarted: (jobId: string) => void;
 }
 
+const INDEX_OVERRIDE_KEYS = ['EMBEDDING_BATCH_SIZE'] as const;
+
 export function RunIndexForm({ onStarted }: Props) {
   const [dbName, setDbName] = useState('');
-  const [batchSize, setBatchSize] = useState(32);
   const [concurrency, setConcurrency] = useState(1);
-  const start = useStartJob<Body>('/tasks/index');
+  const configQ = useBackendConfig();
+  const { overrides } = useConfigOverrides();
+  const effectiveBatchSize =
+    overrides.EMBEDDING_BATCH_SIZE ?? configQ.data?.tunable.EMBEDDING_BATCH_SIZE ?? 8;
+  const start = useStartJob<Body>('/tasks/index', pickOverrides(overrides, INDEX_OVERRIDE_KEYS));
 
   return (
     <Stack spacing={2} sx={{ maxWidth: 560 }}>
@@ -29,8 +35,9 @@ export function RunIndexForm({ onStarted }: Props) {
         <TextField
           type="number"
           label="Batch size"
-          value={batchSize}
-          onChange={(e) => setBatchSize(Math.max(1, Number(e.target.value) || 1))}
+          value={effectiveBatchSize}
+          helperText="Edit on Settings page"
+          disabled
         />
         <TextField
           type="number"
@@ -45,7 +52,7 @@ export function RunIndexForm({ onStarted }: Props) {
         disabled={start.isPending || dbName.trim() === ''}
         onClick={() =>
           start.mutate(
-            { db_name: dbName.trim(), batch_size: batchSize, concurrency },
+            { db_name: dbName.trim(), concurrency },
             { onSuccess: (r) => onStarted(r.job_id) },
           )
         }

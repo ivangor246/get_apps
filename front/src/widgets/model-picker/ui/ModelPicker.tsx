@@ -10,23 +10,19 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { useQueryClient } from '@tanstack/react-query';
-import { useConfig, useUpdateConfig } from '../../../entities/config';
-import {
-  OLLAMA_MODELS_KEY,
-  useLoadOllamaModel,
-  useOllamaModels,
-} from '../../../entities/ollama';
+import { useBackendConfig } from '../../../entities/config';
+import { useLoadOllamaModel, useOllamaModels } from '../../../entities/ollama';
+import { useConfigOverrides } from '../../../shared/config';
 
 export function ModelPicker() {
-  const qc = useQueryClient();
   const modelsQ = useOllamaModels();
-  const configQ = useConfig();
-  const updateConfig = useUpdateConfig();
+  const configQ = useBackendConfig();
+  const { overrides, setOverride } = useConfigOverrides();
   const loadMutation = useLoadOllamaModel();
 
   const data = modelsQ.data;
-  const current = data?.current ?? '';
+  const backendDefault = data?.current ?? configQ.data?.tunable.OLLAMA_LLM_MODEL ?? '';
+  const current = overrides.OLLAMA_LLM_MODEL ?? backendDefault;
   const models = data?.models ?? [];
   const currentInfo = models.find((m) => m.name === current);
   const downloadedCount = models.filter((m) => m.downloaded).length;
@@ -38,28 +34,37 @@ export function ModelPicker() {
         ? 'loaded'
         : 'not loaded';
 
-  const savedCtx = configQ.data?.OLLAMA_CONTEXT_SIZE ?? 0;
+  const defaultCtx = configQ.data?.tunable.OLLAMA_CONTEXT_SIZE ?? 0;
+  const effectiveCtx = overrides.OLLAMA_CONTEXT_SIZE ?? defaultCtx;
   const [ctxInput, setCtxInput] = useState<string>('');
   useEffect(() => {
-    if (savedCtx > 0) setCtxInput(String(savedCtx));
-  }, [savedCtx]);
+    if (effectiveCtx > 0) setCtxInput(String(effectiveCtx));
+  }, [effectiveCtx]);
 
   const handleSelect = (value: string) => {
     if (value === current) return;
-    updateConfig.mutate(
-      { OLLAMA_LLM_MODEL: value },
-      { onSuccess: () => qc.invalidateQueries({ queryKey: OLLAMA_MODELS_KEY }) },
-    );
+    if (value === backendDefault) {
+      setOverride('OLLAMA_LLM_MODEL', undefined);
+    } else {
+      setOverride('OLLAMA_LLM_MODEL', value);
+    }
   };
 
   const commitContext = () => {
     const parsed = Number(ctxInput);
-    if (!Number.isFinite(parsed) || parsed <= 0 || parsed === savedCtx) {
-      setCtxInput(String(savedCtx));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setCtxInput(String(effectiveCtx));
       return;
     }
-    updateConfig.mutate({ OLLAMA_CONTEXT_SIZE: Math.floor(parsed) });
+    const rounded = Math.floor(parsed);
+    if (rounded === defaultCtx) {
+      setOverride('OLLAMA_CONTEXT_SIZE', undefined);
+    } else {
+      setOverride('OLLAMA_CONTEXT_SIZE', rounded);
+    }
   };
+
+  const isModelOverridden = overrides.OLLAMA_LLM_MODEL !== undefined;
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -79,8 +84,9 @@ export function ModelPicker() {
               label="Active model"
               value={current}
               onChange={(e) => handleSelect(e.target.value)}
-              disabled={updateConfig.isPending || models.length === 0}
+              disabled={models.length === 0}
               sx={{ minWidth: 320 }}
+              helperText={isModelOverridden ? `Override (default: ${backendDefault})` : ' '}
             >
               {models.length === 0 ? (
                 <MenuItem value="" disabled>
@@ -133,10 +139,10 @@ export function ModelPicker() {
                 (e.target as HTMLInputElement).blur();
               }
             }}
-            disabled={configQ.isLoading || updateConfig.isPending}
+            disabled={configQ.isLoading}
             size="small"
             inputProps={{ min: 1, step: 256 }}
-            helperText="Applied on next request; reload the model via Start to resize a loaded instance."
+            helperText={`Default: ${defaultCtx}. Sent with each RAG request.`}
             sx={{ minWidth: 240, mt: 1, mb: 1 }}
           />
 
@@ -144,11 +150,6 @@ export function ModelPicker() {
             Status: {status} · {downloadedCount} local model{downloadedCount === 1 ? '' : 's'}
           </Typography>
 
-          {updateConfig.error ? (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              Failed to save model selection: {String(updateConfig.error)}
-            </Alert>
-          ) : null}
           {loadMutation.error ? (
             <Alert severity="error" sx={{ mt: 2 }}>
               Failed to start model: {String(loadMutation.error)}

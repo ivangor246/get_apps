@@ -1,2 +1,2 @@
-export { useConfig, useConfigDefaults, useUpdateConfig } from './model/hooks';
-export type { AppConfig, AppConfigPatch } from './model/types';
+export { useBackendConfig } from './model/hooks';
+export type { BackendConfig, ConfigOverrides, ReadOnlyConfig, TunableConfig } from './model/types';

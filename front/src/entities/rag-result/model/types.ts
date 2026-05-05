@@ -28,5 +28,4 @@ export interface RAGResponse {
 export interface RAGQueryPayload {
   db_name: string;
   query: string;
-  top_k?: number;
 }
