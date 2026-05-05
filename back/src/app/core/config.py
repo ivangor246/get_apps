@@ -34,7 +34,7 @@ class Config:
     OLLAMA_CONTEXT_SIZE: int = 10240
 
     EMBEDDING_MODEL: str = 'intfloat/multilingual-e5-large'
-    EMBEDDING_DEVICE: str = 'cuda'
+    EMBEDDING_DEVICE: str = 'cpu'
     EMBEDDING_DIM: int = 1024
     EMBEDDING_BATCH_SIZE: int = 8
     EMBEDDING_GPU_MEM_LIMIT_MB: int = 3072
