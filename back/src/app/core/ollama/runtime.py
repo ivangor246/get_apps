@@ -8,9 +8,9 @@ from enum import Enum
 
 import httpx
 
-from .config import get_config
-from .exceptions import OllamaError
-from .ollama import OllamaClient
+from ..config import get_config
+from ..exceptions import OllamaError
+from .client import OllamaClient
 
 logger = logging.getLogger('app')
 

@@ -4,8 +4,8 @@ from types import TracebackType
 
 import httpx
 
-from .config import config, get_config
-from .exceptions import OllamaError, OllamaHTTPError
+from ..config import config, get_config
+from ..exceptions import OllamaError, OllamaHTTPError
 
 
 class OllamaClient:
