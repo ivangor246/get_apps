@@ -49,8 +49,7 @@ back/                              # Backend root (Poetry project)
 └── saved_data/
     ├── categories/{timestamp}/*.txt   # raw app IDs per category per run
     ├── databases/{name}.sqlite3       # collected app metadata, one DB per run set
-    ├── chroma/{name}/                 # persistent vector index, one dir per DB
-    └── config.json                    # user overrides of runtime config
+    └── chroma/{name}/                 # persistent vector index, one dir per DB
 
 front/src/                         # Feature-Sliced Design:
 ├── app/                           # App component + providers (theme, query client, router)
@@ -77,12 +76,11 @@ All Poetry/uvicorn commands run from `back/` (see `Makefile`).
 
 ## Configuration
 
-**No `.env` files.** Hardcoded defaults live in [back/src/app/core/config.py](back/src/app/core/config.py); user overrides persist to `back/saved_data/config.json` and are edited from the Settings page.
+**Front and back are independent on configuration.** The backend owns hardcoded defaults in [back/src/app/core/config.py](back/src/app/core/config.py) and exposes them read-only via `GET /api/config`. The frontend fetches those defaults on load, lets the user edit tunable fields on the Settings page, and persists user overrides in **browser localStorage**. Each request from the frontend includes only the overrides relevant to that endpoint as **query parameters**; the backend never persists user-level config.
 
-- Tunable (settable from UI): Ollama URL/model/timeout, embedding model/device/dim/batch/VRAM cap, RAG top_k/candidate_k, API host/port.
-- Not tunable (code-only): file paths, RuStore URLs + category list, pagination count.
-
-Overrides apply immediately for values looked up per-request. Values consumed at startup (embedder model, Ollama client base URL) require a backend restart to take effect.
+- Tunable per-request (sent as query params): `OLLAMA_LLM_MODEL`, `OLLAMA_TIMEOUT`, `OLLAMA_CONTEXT_SIZE`, `RAG_TOP_K`, `RAG_CANDIDATE_K`, `EMBEDDING_BATCH_SIZE`.
+- Read-only (backend-startup, require code edit + restart): `OLLAMA_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DEVICE`, `EMBEDDING_DIM`, `EMBEDDING_GPU_MEM_LIMIT_MB`.
+- Not exposed to UI: file paths, RuStore URLs + category list, pagination count, `API_HOST`/`API_PORT`.
 
 ## Background Jobs & SSE
 
