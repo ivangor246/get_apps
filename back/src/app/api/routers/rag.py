@@ -24,6 +24,7 @@ async def rag_query(
     ollama_context_size: int | None = Query(default=None, ge=1),
 ) -> RAGQueryResponse:
     """Run the RAG pipeline against the selected DB."""
+
     service: RAGService = await request.app.state.get_rag_service(body.db_name)
     response = await service.answer(
         body.query,
