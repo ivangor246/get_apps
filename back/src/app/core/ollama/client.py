@@ -4,7 +4,7 @@ from types import TracebackType
 
 import httpx
 
-from ..config import config, get_config
+from ..config import config
 from ..exceptions import OllamaError, OllamaHTTPError
 
 
@@ -35,6 +35,7 @@ class OllamaClient:
 
     async def aclose(self) -> None:
         """Release the underlying HTTP client."""
+
         await self._client.aclose()
 
     async def generate(
@@ -48,37 +49,43 @@ class OllamaClient:
         timeout: float | None = None,
     ) -> str:
         """Generate a completion; the model name is supplied per call by the caller."""
+
         if not model:
             raise OllamaError('Ollama generate requires an explicit model name.')
-        cfg = get_config()
+
         payload: dict = {
             'model': model,
             'prompt': prompt,
             'stream': False,
-            'options': {'num_ctx': context_size or cfg.OLLAMA_CONTEXT_SIZE},
+            'options': {'num_ctx': context_size or config.OLLAMA_CONTEXT_SIZE},
         }
         if system is not None:
             payload['system'] = system
         if json_format:
             payload['format'] = 'json'
+
         data = await self._post_json('/api/generate', payload, timeout=timeout)
         response = data.get('response')
         if not isinstance(response, str):
             raise OllamaError(f'Unexpected generate response: {data!r}')
+
         return response
 
     async def list_local_models(self) -> list[str]:
         """Return names of models pulled to disk (GET /api/tags)."""
+
         data = await self._get_json('/api/tags')
         return [str(item.get('name', '')) for item in data.get('models', []) if item.get('name')]
 
     async def list_loaded_models(self) -> list[str]:
         """Return names of models currently resident in memory (GET /api/ps)."""
+
         data = await self._get_json('/api/ps')
         return [str(item.get('name', '')) for item in data.get('models', []) if item.get('name')]
 
     async def load_model(self, name: str) -> None:
         """Force a model into memory by issuing an empty generate with keep_alive and configured context."""
+
         await self._post_json(
             '/api/generate',
             {
@@ -86,7 +93,7 @@ class OllamaClient:
                 'prompt': '',
                 'stream': False,
                 'keep_alive': '5m',
-                'options': {'num_ctx': get_config().OLLAMA_CONTEXT_SIZE},
+                'options': {'num_ctx': config.OLLAMA_CONTEXT_SIZE},
             },
         )
 

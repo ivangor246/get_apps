@@ -13,6 +13,7 @@ router = APIRouter(tags=['config'])
 @router.get('/config', response_model=ConfigSchema)
 async def get_config() -> ConfigSchema:
     """Expose backend-owned defaults so the frontend can seed its Settings UI."""
+
     return ConfigSchema(
         tunable=TunableConfigSchema(
             OLLAMA_TIMEOUT=config.OLLAMA_TIMEOUT,

@@ -8,7 +8,7 @@ from enum import Enum
 
 import httpx
 
-from ..config import get_config
+from ..config import config
 from .client import OllamaClient
 
 logger = logging.getLogger('app')
@@ -40,9 +40,8 @@ class OllamaRuntime:
     _STOP_TIMEOUT = 5.0
 
     def __init__(self, client: OllamaClient) -> None:
-        cfg = get_config()
         self._client = client
-        self._base_url = cfg.OLLAMA_URL.rstrip('/')
+        self._base_url = config.OLLAMA_URL.rstrip('/')
         self._process: asyncio.subprocess.Process | None = None
         self.state = OllamaState()
 

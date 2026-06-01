@@ -73,6 +73,7 @@ class Config:
 @lru_cache
 def get_config() -> Config:
     """Return the single Config instance; values do not change after startup."""
+
     return Config()
 
 

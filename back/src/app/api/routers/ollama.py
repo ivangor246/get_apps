@@ -14,7 +14,9 @@ router = APIRouter(prefix='/ollama', tags=['ollama'])
 @router.get('/models', response_model=OllamaModelsResponse)
 async def list_ollama_models(request: Request) -> OllamaModelsResponse:
     """List models available in the local Ollama instance with their loaded state."""
+
     client: OllamaClient = request.app.state.ollama
+
     try:
         local = await client.list_local_models()
     except OllamaError as err:
@@ -23,6 +25,7 @@ async def list_ollama_models(request: Request) -> OllamaModelsResponse:
         loaded = set(await client.list_loaded_models())
     except OllamaError:
         loaded = set()
+
     models = [OllamaModelInfo(name=name, downloaded=True, loaded=name in loaded) for name in local]
     return OllamaModelsResponse(models=models)
 
@@ -30,7 +33,9 @@ async def list_ollama_models(request: Request) -> OllamaModelsResponse:
 @router.post('/models/load', status_code=204)
 async def load_ollama_model(request: Request, body: OllamaModelLoadRequest) -> None:
     """Pin the specified model into Ollama memory by issuing an empty generate call."""
+
     client: OllamaClient = request.app.state.ollama
+
     try:
         await client.load_model(body.model)
     except OllamaHTTPError as err:
