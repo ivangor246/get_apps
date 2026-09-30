@@ -15,6 +15,10 @@ class RustoreParseError(RustoreError):
         super().__init__(f"Failed to parse apps from {url}")
 
 
+class EmbeddingModelMissingError(Exception):
+    pass
+
+
 class OllamaError(Exception):
     pass
 

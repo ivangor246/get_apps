@@ -25,7 +25,7 @@ ollama pull gemma3:1b
 ollama serve   # если не запущен как сервис
 ```
 
-Эмбеддинги считаются локально через `fastembed-gpu` (`intfloat/multilingual-e5-large`). Модель и URL Ollama меняются в UI на странице **Settings** — значения сохраняются в `saved_data/config.json`.
+Эмбеддинги считаются локально через `fastembed-gpu` (`intfloat/multilingual-e5-large`). Модель эмбеддингов (~2 ГБ) автоматически не скачивается — её нужно скачать кнопкой **Download** на странице **Settings**. Модель и URL Ollama меняются в UI на странице **Settings** — значения сохраняются в `saved_data/config.json`.
 
 ## Запуск
 

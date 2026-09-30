@@ -7,6 +7,7 @@ import warnings
 from pathlib import Path
 
 from .config import config
+from .exceptions import EmbeddingModelMissingError
 
 warnings.filterwarnings(
     'ignore',
@@ -66,17 +67,37 @@ class TextEmbedder:
         self._model_name = model_name or config.EMBEDDING_MODEL
         self._device = device or config.EMBEDDING_DEVICE
         self._cache_dir = cache_dir or str(config.CACHE_DIR)
-        providers = self._providers_for(self._device)
-        config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info(
-            'Loading embedding model %s (providers=%s, cache_dir=%s)',
-            self._model_name, providers, self._cache_dir,
-        )
-        self._model = TextEmbedding(
-            model_name=self._model_name,
-            cache_dir=self._cache_dir,
-            providers=providers,
-        )
+        self._model: TextEmbedding | None = None
+        self.downloading = False
+        self.error: str | None = None
+
+    @property
+    def model_name(self) -> str:
+        """Name of the configured fastembed model."""
+        return self._model_name
+
+    @property
+    def ready(self) -> bool:
+        """Whether the model is loaded and can encode."""
+        return self._model is not None
+
+    def load(self) -> None:
+        """Load the model from the local cache only; on failure stays not ready with ``error`` set."""
+        try:
+            self._model = self._build(local_files_only=True)
+            self.error = None
+        except Exception as err:  # noqa: BLE001
+            self.error = str(err) or type(err).__name__
+            logger.warning('Embedding model %s is not available locally: %s', self._model_name, self.error)
+
+    async def download(self) -> None:
+        """Download the model into the cache and load it; the blocking fetch runs in a thread."""
+        self.downloading = True
+        try:
+            self._model = await asyncio.to_thread(self._build, local_files_only=False)
+            self.error = None
+        finally:
+            self.downloading = False
 
     async def embed_passages(self, texts: list[str], batch_size: int | None = None) -> list[list[float]]:
         """Encode indexable documents with the e5 ``passage:`` prefix."""
@@ -93,8 +114,31 @@ class TextEmbedder:
         return vectors[0]
 
     def _encode_sync(self, texts: list[str], batch_size: int) -> list[list[float]]:
+        """Encode texts with the loaded model; raises if the model was never downloaded."""
+        if self._model is None:
+            raise EmbeddingModelMissingError(
+                f'Embedding model {self._model_name} is not downloaded; download it on the Settings page'
+            )
         vectors = list(self._model.embed(texts, batch_size=batch_size))
         return [vec.tolist() for vec in vectors]
+
+    def _build(self, local_files_only: bool) -> TextEmbedding:
+        """Instantiate fastembed; with ``local_files_only`` it never touches the network."""
+        providers = self._providers_for(self._device)
+        config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(
+            'Loading embedding model %s (providers=%s, cache_dir=%s, local_files_only=%s)',
+            self._model_name,
+            providers,
+            self._cache_dir,
+            local_files_only,
+        )
+        return TextEmbedding(
+            model_name=self._model_name,
+            cache_dir=self._cache_dir,
+            providers=providers,
+            local_files_only=local_files_only,
+        )
 
     @staticmethod
     def _providers_for(device: str) -> list:

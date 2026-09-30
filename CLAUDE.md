@@ -56,6 +56,7 @@ No `.env`. Defaults live in [back/src/app/core/config.py](back/src/app/core/conf
 
 - `get_config()` returns fresh values after a save; the module-level `config` is a snapshot taken at import. Read tunable values via `get_config()` at call time.
 - Clients built in the app lifespan (Ollama base URL/timeout, embedder model/device) only pick up changes after a backend restart.
+- Models are never downloaded implicitly (startup, first use): the embedder loads from the local cache only and downloads on an explicit Settings-page action; Ollama models are pulled by the user.
 
 ## Background jobs
 

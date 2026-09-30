@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
         ollama_runtime = OllamaRuntime(client)
         startup_task = asyncio.create_task(ollama_runtime.start())
         embedder = TextEmbedder()
+        embedder.load()
         rag_cache: dict[str, RAGService] = {}
         engines: dict[str, object] = {}
         lock = asyncio.Lock()

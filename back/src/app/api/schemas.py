@@ -45,11 +45,20 @@ class OllamaStatusSchema(BaseModel):
     model: str | None = None
 
 
+class EmbeddingStatusSchema(BaseModel):
+    """Availability of the local embedding model: ready, missing or downloading."""
+
+    status: str
+    detail: str | None = None
+    model: str
+
+
 class SystemStatusSchema(BaseModel):
-    """Aggregated startup status for the backend and Ollama."""
+    """Aggregated startup status for the backend, Ollama and the embedding model."""
 
     backend: str
     ollama: OllamaStatusSchema
+    embedding: EmbeddingStatusSchema
 
 
 class OllamaModelInfo(BaseModel):

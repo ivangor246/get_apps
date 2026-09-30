@@ -1,7 +1,11 @@
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
-import { useSystemStatus, type OllamaStatus } from '../../../entities/system-status';
+import {
+  useSystemStatus,
+  type EmbeddingStatus,
+  type OllamaStatus,
+} from '../../../entities/system-status';
 
 type ChipColor = 'default' | 'success' | 'warning' | 'error';
 
@@ -23,6 +27,18 @@ const OLLAMA_COLORS: Record<OllamaStatus, ChipColor> = {
   warming_up: 'warning',
   ready: 'success',
   error: 'error',
+};
+
+const EMBEDDING_LABELS: Record<EmbeddingStatus, string> = {
+  ready: 'Embeddings: ready',
+  missing: 'Embeddings: model missing',
+  downloading: 'Embeddings: downloading…',
+};
+
+const EMBEDDING_COLORS: Record<EmbeddingStatus, ChipColor> = {
+  ready: 'success',
+  missing: 'error',
+  downloading: 'warning',
 };
 
 export function StatusIndicator() {
@@ -61,6 +77,20 @@ export function StatusIndicator() {
           size="small"
           color={OLLAMA_COLORS[ollama.status]}
           label={OLLAMA_LABELS[ollama.status]}
+        />
+      </Tooltip>
+      <Tooltip
+        title={
+          data.embedding.status === 'missing'
+            ? `model: ${data.embedding.model}\nDownload it on the Settings page`
+            : `model: ${data.embedding.model}`
+        }
+        placement="bottom-end"
+      >
+        <Chip
+          size="small"
+          color={EMBEDDING_COLORS[data.embedding.status]}
+          label={EMBEDDING_LABELS[data.embedding.status]}
         />
       </Tooltip>
     </Box>

@@ -13,7 +13,16 @@ export interface OllamaStatusInfo {
   model: string | null;
 }
 
+export type EmbeddingStatus = 'ready' | 'missing' | 'downloading';
+
+export interface EmbeddingStatusInfo {
+  status: EmbeddingStatus;
+  detail: string | null;
+  model: string;
+}
+
 export interface SystemStatus {
   backend: string;
   ollama: OllamaStatusInfo;
+  embedding: EmbeddingStatusInfo;
 }

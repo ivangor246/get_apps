@@ -3,8 +3,9 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app.core import TextEmbedder
 from app.core.config import get_config, get_tunable_defaults, settings_store
-from app.core.exceptions import OllamaError, OllamaHTTPError
+from app.core.exceptions import EmbeddingModelMissingError, OllamaError, OllamaHTTPError
 from app.core.jobs import JobManager
 from app.core.ollama import OllamaClient
 from app.services import RAGService
@@ -20,6 +21,7 @@ from .schemas import (
     CollectAppsRequest,
     CollectCategoriesRequest,
     DatabasesResponse,
+    EmbeddingStatusSchema,
     IndexRequest,
     JobCreated,
     JobSnapshot,
@@ -40,6 +42,11 @@ def _jobs(request: Request) -> JobManager:
     return request.app.state.jobs
 
 
+def _embedder(request: Request) -> TextEmbedder:
+    """Shared embedder created in the app lifespan."""
+    return request.app.state.embedder
+
+
 @router.get('/health')
 async def health() -> dict:
     """Liveness probe."""
@@ -48,14 +55,26 @@ async def health() -> dict:
 
 @router.get('/status', response_model=SystemStatusSchema)
 async def system_status(request: Request) -> SystemStatusSchema:
-    """Aggregated backend + Ollama runtime status for the UI status indicator."""
+    """Aggregated backend + Ollama runtime + embedding model status for the UI status indicator."""
     state = request.app.state.ollama_runtime.state
+    embedder = _embedder(request)
+    if embedder.downloading:
+        embedding_status = 'downloading'
+    elif embedder.ready:
+        embedding_status = 'ready'
+    else:
+        embedding_status = 'missing'
     return SystemStatusSchema(
         backend='ready',
         ollama=OllamaStatusSchema(
             status=state.status.value,
             detail=state.detail,
             model=get_config().OLLAMA_LLM_MODEL,
+        ),
+        embedding=EmbeddingStatusSchema(
+            status=embedding_status,
+            detail=embedder.error if embedding_status == 'missing' else None,
+            model=embedder.model_name,
         ),
     )
 
@@ -115,6 +134,22 @@ async def load_ollama_model(request: Request, body: OllamaModelLoadRequest) -> N
         raise HTTPException(status_code=503, detail=str(err)) from err
 
 
+@router.post('/embedding/model/download', response_model=JobCreated)
+async def download_embedding_model(request: Request) -> JobCreated:
+    """Download the configured embedding model into the local cache as a background job."""
+    embedder = _embedder(request)
+    if embedder.downloading:
+        raise HTTPException(status_code=409, detail='Embedding model download is already in progress')
+
+    async def work(handle):
+        handle.log(f'Downloading embedding model {embedder.model_name}')
+        await embedder.download()
+        handle.log('Done.')
+
+    job = _jobs(request).submit('download-embedding-model', work)
+    return JobCreated(job_id=job.id, kind=job.kind)
+
+
 @router.get('/databases', response_model=DatabasesResponse)
 async def list_databases() -> DatabasesResponse:
     """List SQLite databases under saved_data/databases/ (by stem name)."""
@@ -165,6 +200,7 @@ async def start_index(request: Request, body: IndexRequest) -> JobCreated:
         handle.log(f'Indexing db={body.db_name} batch_size={body.batch_size}')
         await run_index_task(
             db_name=body.db_name,
+            embedder=_embedder(request),
             batch_size=body.batch_size,
             concurrency=body.concurrency,
         )
@@ -206,7 +242,10 @@ async def cancel_task(request: Request, job_id: str) -> dict:
 async def rag_query(request: Request, body: RAGQueryRequest) -> RAGQueryResponse:
     """Run the RAG pipeline against the selected DB."""
     service: RAGService = await request.app.state.get_rag_service(body.db_name)
-    response = await service.answer(body.query, top_k=body.top_k)
+    try:
+        response = await service.answer(body.query, top_k=body.top_k)
+    except EmbeddingModelMissingError as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
     return RAGQueryResponse(
         answer=response.answer,
         filters=AppliedFilters(**asdict(response.filters)),
