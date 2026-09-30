@@ -31,7 +31,7 @@ The user runs install/dependency/server commands themselves: propose `poetry add
 back/                # self-contained Poetry project; run Python tooling from here
 └── src/app/
     ├── main.py      # uvicorn entrypoint (`make start`)
-    ├── api/         # app factory (lifespan builds Ollama client + embedder), routes.py, schemas.py
+    ├── api/         # app.py (factory + lifespan), deps.py (app.state accessors), routes/ + schemas/ one module per domain
     ├── core/        # config, jobs (SSE), db, chroma, embedder, ollama (LLM), ollama_runtime (model list/load)
     ├── services/    # domain logic: Rustore*, EmbeddingIndexer, Retrieval, RAG; parsers/ = page parsers
     ├── tasks/       # one coroutine per pipeline run, wiring services together

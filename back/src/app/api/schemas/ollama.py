@@ -1,0 +1,22 @@
+from pydantic import BaseModel, Field
+
+
+class OllamaModelInfo(BaseModel):
+    """One Ollama model entry: name plus its downloaded and currently-loaded state."""
+
+    name: str
+    downloaded: bool
+    loaded: bool
+
+
+class OllamaModelsResponse(BaseModel):
+    """Listing of locally available Ollama models plus the currently configured choice."""
+
+    current: str
+    models: list[OllamaModelInfo]
+
+
+class OllamaModelLoadRequest(BaseModel):
+    """Request body for POST /ollama/models/load."""
+
+    model: str = Field(..., min_length=1)
