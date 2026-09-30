@@ -4,7 +4,7 @@
 
 ## Требования
 
-- **Python** 3.14+
+- **Python** 3.13+
 - **Poetry** 2.0+
 - **Node.js** 20+ / **npm**
 - **Ollama** (локально, для LLM) — [ollama.com](https://ollama.com)

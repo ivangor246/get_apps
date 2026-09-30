@@ -6,7 +6,7 @@ Web UI tool for collecting and analyzing RuStore catalogue data. No CLI — ever
 2. **Indexing** — descriptions embedded with fastembed (ONNX, GPU) into Chroma.
 3. **RAG** — retrieval + filter extraction + answer via a local Ollama LLM.
 
-**Stack:** Python 3.14, FastAPI, Playwright + BeautifulSoup, async SQLAlchemy/aiosqlite, ChromaDB, fastembed-gpu, Ollama over `httpx`, Poetry, Ruff · React 19, TypeScript, Vite, MUI 6, React Router, TanStack Query, Feature-Sliced Design.
+**Stack:** Python 3.13, FastAPI, Playwright + BeautifulSoup, async SQLAlchemy/aiosqlite, ChromaDB, fastembed-gpu, Ollama over `httpx`, Poetry, Ruff · React 19, TypeScript, Vite, MUI 6, React Router, TanStack Query, Feature-Sliced Design.
 
 ## Commands
 
@@ -74,7 +74,7 @@ No `.env`. Defaults live in [back/src/app/core/config.py](back/src/app/core/conf
 ## Code style
 
 - Consistency with surrounding code beats personal preference.
-- Python: Ruff, line length 120, single quotes, async throughout. Python 3.14 syntax is intentional (e.g. `except A, B:` without parentheses) — don't "fix" it.
+- Python: Ruff, line length 120, single quotes, async throughout. Target is Python 3.13: no 3.14-only features (unparenthesized `except A, B:`, unquoted forward-reference annotations outside `from __future__ import annotations`).
 - Frontend: respect FSD import direction; cross-slice imports only via the slice's `index.ts`. UI in `ui/`, data hooks/queries in `model/`, API calls through `shared/api`.
 - Comments only for non-obvious *why*.
 - Docstrings/JSDoc are required on every class, method and function, max 3 lines (purpose, non-obvious params/returns, caveats). Nothing else gets documented.
