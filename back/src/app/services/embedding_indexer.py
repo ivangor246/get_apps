@@ -23,9 +23,7 @@ _DROP_CATEGORIES = frozenset({'So', 'Sk', 'Cs', 'Cf', 'Co'})
 def _clean_text(value: str) -> str:
     """NFKC-normalize, drop emoji/decorative symbols, collapse whitespace."""
     normalized = unicodedata.normalize('NFKC', value)
-    filtered = ''.join(
-        ch for ch in normalized if unicodedata.category(ch) not in _DROP_CATEGORIES
-    )
+    filtered = ''.join(ch for ch in normalized if unicodedata.category(ch) not in _DROP_CATEGORIES)
     return _WHITESPACE_RE.sub(' ', filtered).strip()
 
 
@@ -62,10 +60,7 @@ class EmbeddingIndexerService:
             if not pending:
                 return
 
-            batches = [
-                pending[start : start + self.batch_size]
-                for start in range(0, len(pending), self.batch_size)
-            ]
+            batches = [pending[start : start + self.batch_size] for start in range(0, len(pending), self.batch_size)]
             semaphore = asyncio.Semaphore(self.concurrency)
             write_lock = asyncio.Lock()
             total = len(pending)
@@ -74,9 +69,7 @@ class EmbeddingIndexerService:
             async def process(batch: list[dict]) -> None:
                 nonlocal done
                 async with semaphore:
-                    chunks_per_row = [
-                        _chunk_text(self._build_text(row)) for row in batch
-                    ]
+                    chunks_per_row = [_chunk_text(self._build_text(row)) for row in batch]
                     flat_texts = [c for chunks in chunks_per_row for c in chunks]
                     flat_vectors = await self.embedder.embed_passages(flat_texts)
                     ids = [row['app_id'] for row in batch]
@@ -111,8 +104,7 @@ class EmbeddingIndexerService:
 
             chunk_size = 500
             select_sql = text(
-                'SELECT app_id, name, description, categories '
-                'FROM app_info WHERE app_id IN :ids'
+                'SELECT app_id, name, description, categories FROM app_info WHERE app_id IN :ids'
             ).bindparams(bindparam('ids', expanding=True))
             rows: list[dict] = []
             for start in range(0, len(pending_ids), chunk_size):
@@ -137,9 +129,7 @@ class EmbeddingIndexerService:
             except json.JSONDecodeError:
                 pass
         if isinstance(categories_raw, list):
-            categories = ', '.join(
-                cleaned for c in categories_raw if (cleaned := _clean_text(str(c)))
-            )
+            categories = ', '.join(cleaned for c in categories_raw if (cleaned := _clean_text(str(c))))
         elif isinstance(categories_raw, str):
             categories = _clean_text(categories_raw)
         else:

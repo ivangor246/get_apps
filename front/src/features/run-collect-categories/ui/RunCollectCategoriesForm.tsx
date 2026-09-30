@@ -27,9 +27,7 @@ export function RunCollectCategoriesForm({ onStarted }: Props) {
       <Button
         variant="contained"
         disabled={start.isPending}
-        onClick={() =>
-          start.mutate({ concurrency }, { onSuccess: (r) => onStarted(r.job_id) })
-        }
+        onClick={() => start.mutate({ concurrency }, { onSuccess: (r) => onStarted(r.job_id) })}
       >
         {start.isPending ? 'Starting…' : 'Collect categories'}
       </Button>

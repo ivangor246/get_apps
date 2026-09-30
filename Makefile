@@ -1,6 +1,7 @@
 .PHONY: install install-backend install-frontend \
         dev dev-backend dev-frontend \
-        build build-frontend start clean
+        build build-frontend start clean \
+        format format-backend format-frontend
 
 install: install-backend install-frontend
 
@@ -34,3 +35,11 @@ start:
 
 clean:
 	rm -rf front/dist front/node_modules/.vite
+
+format: format-backend format-frontend
+
+format-backend:
+	cd back && poetry run ruff format src
+
+format-frontend:
+	npm --prefix front run format

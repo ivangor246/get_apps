@@ -90,15 +90,17 @@ class RetrievalService:
         chain: list[tuple[FilterSpec, str]] = [(filters, 'original')]
         has_categories = bool(filters.categories_any) or filters.above_median_downloads
         if has_categories:
-            chain.append((
-                FilterSpec(
-                    min_downloads=filters.min_downloads,
-                    max_downloads=filters.max_downloads,
-                    min_rating=filters.min_rating,
-                    requested_count=filters.requested_count,
-                ),
-                'dropped categories and above_median',
-            ))
+            chain.append(
+                (
+                    FilterSpec(
+                        min_downloads=filters.min_downloads,
+                        max_downloads=filters.max_downloads,
+                        min_rating=filters.min_rating,
+                        requested_count=filters.requested_count,
+                    ),
+                    'dropped categories and above_median',
+                )
+            )
         has_any_structural = (
             filters.min_downloads is not None
             or filters.max_downloads is not None

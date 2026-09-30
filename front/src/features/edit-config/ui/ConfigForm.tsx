@@ -8,7 +8,12 @@ import InputAdornment from '@mui/material/InputAdornment';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import { useConfig, useConfigDefaults, useUpdateConfig, type AppConfig } from '../../../entities/config';
+import {
+  useConfig,
+  useConfigDefaults,
+  useUpdateConfig,
+  type AppConfig,
+} from '../../../entities/config';
 
 type FieldSpec = {
   key: keyof AppConfig;
@@ -23,10 +28,21 @@ const FIELDS: FieldSpec[] = [
   { key: 'OLLAMA_TIMEOUT', label: 'Timeout (s)', type: 'number', group: 'Ollama' },
 
   { key: 'EMBEDDING_MODEL', label: 'Embedding model', type: 'text', group: 'Embedding' },
-  { key: 'EMBEDDING_DEVICE', label: 'Device', type: 'select', options: ['cuda', 'cpu'], group: 'Embedding' },
+  {
+    key: 'EMBEDDING_DEVICE',
+    label: 'Device',
+    type: 'select',
+    options: ['cuda', 'cpu'],
+    group: 'Embedding',
+  },
   { key: 'EMBEDDING_DIM', label: 'Dim', type: 'number', group: 'Embedding' },
   { key: 'EMBEDDING_BATCH_SIZE', label: 'Batch size', type: 'number', group: 'Embedding' },
-  { key: 'EMBEDDING_GPU_MEM_LIMIT_MB', label: 'GPU mem limit (MB)', type: 'number', group: 'Embedding' },
+  {
+    key: 'EMBEDDING_GPU_MEM_LIMIT_MB',
+    label: 'GPU mem limit (MB)',
+    type: 'number',
+    group: 'Embedding',
+  },
 
   { key: 'RAG_TOP_K', label: 'Top K', type: 'number', group: 'RAG' },
   { key: 'RAG_CANDIDATE_K', label: 'Candidate K', type: 'number', group: 'RAG' },
@@ -123,15 +139,19 @@ export function ConfigForm() {
         </Box>
       ))}
 
-      {update.error ? <Alert severity="error" sx={{ mb: 2 }}>{String(update.error)}</Alert> : null}
-      {update.isSuccess && !dirty ? <Alert severity="success" sx={{ mb: 2 }}>Saved.</Alert> : null}
+      {update.error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {String(update.error)}
+        </Alert>
+      ) : null}
+      {update.isSuccess && !dirty ? (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Saved.
+        </Alert>
+      ) : null}
 
       <Stack direction="row" spacing={2}>
-        <Button
-          type="submit"
-          variant="contained"
-          disabled={!dirty || update.isPending}
-        >
+        <Button type="submit" variant="contained" disabled={!dirty || update.isPending}>
           {update.isPending ? 'Saving…' : 'Save'}
         </Button>
         <Button

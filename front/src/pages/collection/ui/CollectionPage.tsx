@@ -29,7 +29,8 @@ export function CollectionPage() {
         2. Collect app details
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Fetches full metadata for each app ID from the chosen run and stores it in a SQLite database.
+        Fetches full metadata for each app ID from the chosen run and stores it in a SQLite
+        database.
       </Typography>
       <RunCollectAppsForm onStarted={setJobId} />
 

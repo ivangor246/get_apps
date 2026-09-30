@@ -16,7 +16,10 @@ interface Props {
   onStarted: (jobId: string) => void;
 }
 
-const STATUS_CHIP: Record<EmbeddingStatus, { label: string; color: 'success' | 'warning' | 'error' }> = {
+const STATUS_CHIP: Record<
+  EmbeddingStatus,
+  { label: string; color: 'success' | 'warning' | 'error' }
+> = {
   ready: { label: 'downloaded', color: 'success' },
   downloading: { label: 'downloading…', color: 'warning' },
   missing: { label: 'not downloaded', color: 'error' },

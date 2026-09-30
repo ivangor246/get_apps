@@ -15,7 +15,8 @@ make install        # poetry install + playwright chromium + npm install
 make dev            # backend :8000 (reload) + frontend :5173
 make build          # build front/dist (served by the backend in `make start`)
 
-cd back && poetry run ruff check src && poetry run ruff format src
+make format         # ruff format (back) + prettier (front)
+cd back && poetry run ruff check src
 npm --prefix front run lint
 npm --prefix front run build   # includes tsc type-check
 ```

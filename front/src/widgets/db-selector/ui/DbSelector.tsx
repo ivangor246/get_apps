@@ -14,7 +14,13 @@ interface Props {
 
 const NEW_SENTINEL = '__new__';
 
-export function DbSelector({ value, onChange, allowNew = false, label = 'Database', helperText }: Props) {
+export function DbSelector({
+  value,
+  onChange,
+  allowNew = false,
+  label = 'Database',
+  helperText,
+}: Props) {
   const { data: dbs = [], isLoading } = useDatabases();
   const isNewValue = allowNew && value !== '' && !dbs.includes(value);
   const selectValue = isNewValue ? NEW_SENTINEL : value;

@@ -16,8 +16,10 @@ import {
 
 function FiltersChips({ filters }: { filters: Filters }) {
   const chips: string[] = [];
-  if (filters.min_downloads != null) chips.push(`downloads ≥ ${filters.min_downloads.toLocaleString()}`);
-  if (filters.max_downloads != null) chips.push(`downloads ≤ ${filters.max_downloads.toLocaleString()}`);
+  if (filters.min_downloads != null)
+    chips.push(`downloads ≥ ${filters.min_downloads.toLocaleString()}`);
+  if (filters.max_downloads != null)
+    chips.push(`downloads ≤ ${filters.max_downloads.toLocaleString()}`);
   if (filters.min_rating != null) chips.push(`rating ≥ ${filters.min_rating}`);
   if (filters.above_median_downloads) chips.push('above median downloads');
   for (const c of filters.categories_any) chips.push(`category: ${c}`);

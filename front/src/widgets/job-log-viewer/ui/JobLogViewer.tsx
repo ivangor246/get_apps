@@ -45,7 +45,10 @@ export function JobLogViewer({ jobId, onClose }: Props) {
     const close = openSse(`/tasks/${jobId}/events`, (ev: SseEvent) => {
       if (ev.type === 'log') {
         counter.current += 1;
-        setLogs((prev) => [...prev.slice(-499), { id: counter.current, text: String(ev.message ?? '') }]);
+        setLogs((prev) => [
+          ...prev.slice(-499),
+          { id: counter.current, text: String(ev.message ?? '') },
+        ]);
       } else if (ev.type === 'progress') {
         if (typeof ev.current === 'number') setCurrent(ev.current);
         if (typeof ev.total === 'number') setTotal(ev.total);
@@ -54,7 +57,7 @@ export function JobLogViewer({ jobId, onClose }: Props) {
       } else if (ev.type === 'done') {
         setStatus('done');
       } else if (ev.type === 'error') {
-        setStatus(((ev.status as JobStatus) ?? 'error'));
+        setStatus((ev.status as JobStatus) ?? 'error');
         if (typeof ev.message === 'string') setError(ev.message);
       }
     });

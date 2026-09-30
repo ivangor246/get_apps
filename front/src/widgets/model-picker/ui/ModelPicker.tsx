@@ -12,11 +12,7 @@ import Typography from '@mui/material/Typography';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useConfig, useUpdateConfig } from '../../../entities/config';
-import {
-  OLLAMA_MODELS_KEY,
-  useLoadOllamaModel,
-  useOllamaModels,
-} from '../../../entities/ollama';
+import { OLLAMA_MODELS_KEY, useLoadOllamaModel, useOllamaModels } from '../../../entities/ollama';
 
 export function ModelPicker() {
   const qc = useQueryClient();
@@ -111,10 +107,7 @@ export function ModelPicker() {
               variant="contained"
               onClick={() => current && loadMutation.mutate(current)}
               disabled={
-                !current
-                || !currentInfo?.downloaded
-                || currentInfo.loaded
-                || loadMutation.isPending
+                !current || !currentInfo?.downloaded || currentInfo.loaded || loadMutation.isPending
               }
             >
               {loadMutation.isPending ? 'Starting…' : 'Start'}

@@ -41,8 +41,6 @@ class RustoreParser:
 
     @classmethod
     async def parse_category(cls, context: BrowserContext, category: str, page_limit: int = 10) -> list[str]:
-        results = await asyncio.gather(
-            *[cls._fetch_page(context, category, page) for page in range(1, page_limit + 1)]
-        )
+        results = await asyncio.gather(*[cls._fetch_page(context, category, page) for page in range(1, page_limit + 1)])
 
         return [app for page_apps in results for app in page_apps]
