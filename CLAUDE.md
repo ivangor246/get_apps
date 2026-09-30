@@ -1,201 +1,85 @@
-> **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
 ## About
 
-Full-stack tool for collecting and analyzing app data from the RuStore catalogue, driven entirely through a web UI.
+Web UI tool for collecting and analyzing RuStore catalogue data. No CLI — everything goes through FastAPI endpoints driven by the React frontend.
 
-**Three core concerns:**
-1. **Collection** — crawl the store by category, fetch per-app metadata, persist to SQLite.
-2. **Indexing** — embed app descriptions into a Chroma vector store.
-3. **RAG** — natural-language queries against the indexed data (retrieval + filter extraction + LLM answer).
+1. **Collection** — Playwright crawls categories → app IDs → per-app metadata → SQLite.
+2. **Indexing** — descriptions embedded with fastembed (ONNX, GPU) into Chroma.
+3. **RAG** — retrieval + filter extraction + answer via a local Ollama LLM.
 
-All three are exposed as HTTP endpoints; there is no CLI. Long-running work runs as background jobs with live progress streamed over Server-Sent Events.
+**Stack:** Python 3.14, FastAPI, Playwright + BeautifulSoup, async SQLAlchemy/aiosqlite, ChromaDB, fastembed-gpu, Ollama over `httpx`, Poetry, Ruff · React 19, TypeScript, Vite, MUI 6, React Router, TanStack Query, Feature-Sliced Design.
 
-## Tech Stack
+## Commands
 
-**Backend**
-- **Python 3.14+**, async throughout (`asyncio`)
-- **FastAPI + uvicorn** — sole entry point
-- **Playwright** — headless browser for RuStore scraping
-- **BeautifulSoup + lxml** — HTML parsing
-- **SQLAlchemy (async) + aiosqlite** — ORM over SQLite
-- **ChromaDB** — local persistent vector store
-- **fastembed-gpu** — ONNX embeddings (`intfloat/multilingual-e5-large` by default)
-- **Ollama** — LLM calls (via `httpx`)
-- **Poetry** — dependency management
-- **Ruff** — linting/formatting
+```bash
+make install        # poetry install + playwright chromium + npm install
+make dev            # backend :8000 (reload) + frontend :5173
+make build          # build front/dist (served by the backend in `make start`)
 
-**Frontend**
-- **React 19 + TypeScript + Vite**
-- **Material UI** (`@mui/material`) — Material Design components
-- **React Router**, **@tanstack/react-query**
-- **Feature-Sliced Design** layout
+poetry run ruff check src && poetry run ruff format src
+npm --prefix front run lint
+npm --prefix front run build   # includes tsc type-check
+```
 
-## Folder Structure
+There is no test suite. Verify changes with ruff + frontend lint/build, and state what you could not verify (scraping, GPU, Ollama need the real environment).
+
+The user runs install/dependency/server commands themselves: propose `poetry add`, `npm install`, `make dev` etc. as code blocks instead of executing them.
+
+## Layout
 
 ```
 src/app/
-├── main.py           # Thin uvicorn entrypoint
-├── api/              # FastAPI app factory, routes, pydantic schemas
-├── core/             # config, jobs (SSE), db, chroma, ollama, embedder
-├── tasks/            # Async coroutines wrapping each collection / index run
-├── services/         # Domain services (Rustore*, RAG, Retrieval, EmbeddingIndexer)
-│   └── parsers/      # Playwright + BeautifulSoup page parsers
-└── models/           # SQLAlchemy ORM models
+├── main.py      # uvicorn entrypoint (`make start`)
+├── api/         # app factory (lifespan builds Ollama client + embedder), routes.py, schemas.py
+├── core/        # config, jobs (SSE), db, chroma, embedder, ollama (LLM), ollama_runtime (model list/load)
+├── services/    # domain logic: Rustore*, EmbeddingIndexer, Retrieval, RAG; parsers/ = page parsers
+├── tasks/       # one coroutine per pipeline run, wiring services together
+└── models/      # SQLAlchemy ORM
 
-front/src/            # Feature-Sliced Design:
-├── app/              # App component + providers (theme, query client, router)
-├── pages/            # home, collection, indexing, settings
-├── widgets/          # app-header, db-selector, job-log-viewer
-├── features/         # toggle-theme, edit-config, run-*, submit-rag-query
-├── entities/         # config, database, job, rag-result
-└── shared/           # api client, SSE helper, theme, config
+front/src/       # FSD: app → pages → widgets → features → entities → shared
 
 saved_data/
-├── categories/{timestamp}/*.txt      # raw app IDs per category per run
-├── databases/{name}.sqlite3          # collected app metadata, one DB per run set
-├── chroma/{name}/                    # persistent vector index, one dir per DB
-└── config.json                       # user overrides of runtime config
+├── categories/{timestamp}/*.txt   # app IDs per category per run
+├── databases/{name}.sqlite3       # collected metadata
+├── chroma/{name}/                 # vector index, one per database
+└── config.json                    # user config overrides
 ```
 
-## Architecture
-
-**Backend layers:**
-1. **API** (`api/`) — thin routes + pydantic schemas. Long-running work is dispatched to the job manager.
-2. **Core** (`core/`) — config, job manager, shared clients (Ollama, embedder, Chroma, DB).
-3. **Services** (`services/`) — domain logic: scraping, indexing, retrieval, RAG orchestration.
-4. **Tasks** (`tasks/`) — async coroutines wiring services together for one run of a pipeline.
-
-**Frontend (FSD):** strict unidirectional imports — `app → pages → widgets → features → entities → shared`. Cross-imports within the same slice go through the public `index.ts`.
-
-**Adding a new store** = new parser + new service + new task + new endpoint + new feature/page on the frontend.
+**New store** = parser + service + task + endpoint + frontend feature/page.
 
 ## Configuration
 
-**No `.env` files.** Hardcoded defaults live in [src/app/core/config.py](src/app/core/config.py); user overrides persist to `saved_data/config.json` and are edited from the Settings page.
+No `.env`. Defaults live in [src/app/core/config.py](src/app/core/config.py): fields with `init=True` on `Config` are tunable from the Settings page and persisted to `saved_data/config.json`; `init=False` fields (paths, RuStore URLs/categories, page count) are code-only.
 
-- Tunable (settable from UI): Ollama URL/model/timeout, embedding model/device/dim/batch/VRAM cap, RAG top_k/candidate_k, API host/port.
-- Not tunable (code-only): file paths, RuStore URLs + category list, pagination count.
+- `get_config()` returns fresh values after a save; the module-level `config` is a snapshot taken at import. Read tunable values via `get_config()` at call time.
+- Clients built in the app lifespan (Ollama base URL/timeout, embedder model/device) only pick up changes after a backend restart.
 
-Overrides apply immediately for values looked up per-request. Values consumed at startup (embedder model, Ollama client base URL) require a backend restart to take effect.
+## Background jobs
 
-## Background Jobs & SSE
-
-Long-running endpoints (`POST /tasks/collect-categories`, `/tasks/collect-apps`, `/tasks/index`) return a `job_id` immediately. The client subscribes to `GET /tasks/{job_id}/events` (SSE) for live `log` / `progress` / `status` / `done` / `error` frames. Service-layer `logging.getLogger('app')` records are auto-forwarded to the job stream — services emit regular log calls, no job-aware plumbing required.
+`POST /tasks/{collect-categories,collect-apps,index}` return a `job_id`; the client streams `GET /tasks/{job_id}/events` (SSE: `log` / `progress` / `status` / `done` / `error`) and can `POST /tasks/{job_id}/cancel`. Records logged to `logging.getLogger('app')` (and children) during a job are forwarded to its stream automatically — services just log, no job plumbing.
 
 ---
 
-## Think Before Coding
+## Working rules
 
-Don't assume. Don't hide confusion. Surface tradeoffs.
+- **Ask when ambiguous.** State assumptions; if there are several readings of the request, list them instead of picking one silently. Push back if a simpler approach exists.
+- **Minimal and surgical.** Implement only what was asked: no speculative options, abstractions for single use, or handling of impossible states. Don't touch unrelated code — mention dead code or bugs you notice instead of fixing them. Remove only the orphans your own change created.
+- **Plan multi-step work** briefly as `step → how it will be verified` before starting.
+- **Errors** are handled where recovery or user feedback is meaningful (routes, job boundaries); never swallowed silently.
+- **Security:** no secrets in code or `config.json` defaults; validate external input (request bodies, scraped HTML, LLM output) at the boundary; flag concerns explicitly.
 
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them — don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+## Code style
 
----
-
-## Code Style
-
-Write professional, idiomatic code consistent with the language and ecosystem.
-
-- Follow language-standard conventions (PEP 8, Airbnb JS, etc.).
-- Use clear, descriptive names.
-- Prefer explicit over implicit.
-- Consistency with existing code overrides personal preference.
-- Frontend: respect FSD import direction. Keep UI in `ui/`, data hooks in `model/`, public exports in `index.ts`.
-
----
-
-## Comments & Documentation
-
-**Comments** — only when necessary. Never explain the obvious.
-Good comment: *why* the code does something non-obvious.
-Bad comment: restating what the code already says.
-
-**Docstrings / JSDoc / etc.** — required for every class, method, and function.
-- Maximum 3 lines: purpose, key params/returns if non-obvious, notable caveats.
-- Do not document anything else (variables, modules, type aliases, etc.).
-
----
-
-## Simplicity First
-
-Minimum code that solves the problem. Nothing speculative.
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-> Ask yourself: *"Would a senior engineer say this is overcomplicated?"* If yes, simplify.
-
----
-
-## Surgical Changes
-
-Touch only what you must. Clean up only your own mess.
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it — don't delete it.
-
-When your changes create orphans:
-- Remove imports / variables / functions that **your** changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-> **The test:** Every changed line should trace directly to the user's request.
-
----
-
-## Goal-Driven Execution
-
-Define success criteria. Loop until verified.
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass."
-- "Fix the bug" → "Write a test that reproduces it, then make it pass."
-- "Refactor X" → "Ensure tests pass before and after."
-
-For multi-step tasks, state a brief plan before starting:
-
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Weak success criteria ("make it work") require constant clarification — avoid them.
-
----
+- Consistency with surrounding code beats personal preference.
+- Python: Ruff, line length 120, single quotes, async throughout. Python 3.14 syntax is intentional (e.g. `except A, B:` without parentheses) — don't "fix" it.
+- Frontend: respect FSD import direction; cross-slice imports only via the slice's `index.ts`. UI in `ui/`, data hooks/queries in `model/`, API calls through `shared/api`.
+- Comments only for non-obvious *why*.
+- Docstrings/JSDoc are required on every class, method and function, max 3 lines (purpose, non-obvious params/returns, caveats). Nothing else gets documented.
 
 ## Git
 
-- **Never run git commands** (commit, push, rebase, etc.) without an explicit user request.
-- At the end of every response that changes code, provide a short suggested commit message in a code block:
+- Never run git commands unless explicitly asked.
+- End every response that changes code with a suggested Conventional Commit message in a code block, scoped like the existing history:
 
 ```
-feat: add JWT refresh token rotation
+feat(ollama): make context size configurable via model picker
 ```
-
----
-
-## Error Handling
-
-- Handle errors at the boundary where recovery or user feedback is meaningful.
-- Don't swallow errors silently.
-- Don't add error handling for states that cannot occur given the current design.
-
----
-
-## Security & Safety
-
-- Never hard-code secrets, API keys, or credentials — use environment variables or the runtime config store, not literals.
-- Validate and sanitize all external input (user, API, file).
-- Prefer well-maintained libraries over custom crypto or auth implementations.
-- Flag security concerns explicitly rather than silently working around them.
