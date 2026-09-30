@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
-BASE_DIR: Path = Path(__file__).parent.parent.parent.parent
+BASE_DIR: Path = Path(__file__).resolve().parents[4]
 DATA_DIR: Path = BASE_DIR / 'saved_data'
 CATEGORIES_DIR: Path = DATA_DIR / 'categories'
 DATABASES_DIR: Path = DATA_DIR / 'databases'
 CHROMA_DIR: Path = DATA_DIR / 'chroma'
-CACHE_DIR: Path = BASE_DIR / 'cache_dir'
+CACHE_DIR: Path = DATA_DIR / 'cache'
 SETTINGS_FILE: Path = DATA_DIR / 'config.json'
 
 CATEGORIES_TIMESTAMP_FORMAT: str = '%d_%m_%Y_%H_%M_%S'

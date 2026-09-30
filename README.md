@@ -57,19 +57,22 @@ make start    # uvicorn отдаёт и API, и статику фронта на
 ## Структура
 
 ```
-src/app/
-├── main.py           # uvicorn entrypoint
-├── api/              # FastAPI (create_app, routes, schemas)
-├── core/             # config, jobs (SSE), db, ollama, chroma, embedder
-├── models/           # ORM (AppInfo)
-├── services/         # парсеры, сбор, индексация, retrieval, RAG
-└── tasks/            # корутины-обёртки для фоновых задач
+back/                 # Python-проект (pyproject.toml, poetry.lock)
+└── src/app/
+    ├── main.py       # uvicorn entrypoint
+    ├── api/          # FastAPI (create_app, routes, schemas)
+    ├── core/         # config, jobs (SSE), db, ollama, chroma, embedder
+    ├── models/       # ORM (AppInfo)
+    ├── services/     # парсеры, сбор, индексация, retrieval, RAG
+    └── tasks/        # корутины-обёртки для фоновых задач
 
-front/src/            # FSD: app / pages / widgets / features / entities / shared
+front/                # React + Vite
+└── src/              # FSD: app / pages / widgets / features / entities / shared
 
-saved_data/
+saved_data/           # runtime-данные, не в git; создаётся автоматически
 ├── categories/<timestamp>/<category>.txt
 ├── databases/<name>.sqlite3
 ├── chroma/<name>/
+├── cache/            # кэш embedding-моделей
 └── config.json       # пользовательские оверрайды конфига
 ```

@@ -176,5 +176,6 @@ psd
 thumb
 sketch
 
-saved_data/
-cache_dir/
+### project ###
+# Runtime data: databases, vector indexes, embedding model cache, config overrides
+/saved_data/

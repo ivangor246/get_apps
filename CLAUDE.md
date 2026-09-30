@@ -15,7 +15,7 @@ make install        # poetry install + playwright chromium + npm install
 make dev            # backend :8000 (reload) + frontend :5173
 make build          # build front/dist (served by the backend in `make start`)
 
-poetry run ruff check src && poetry run ruff format src
+cd back && poetry run ruff check src && poetry run ruff format src
 npm --prefix front run lint
 npm --prefix front run build   # includes tsc type-check
 ```
@@ -27,28 +27,32 @@ The user runs install/dependency/server commands themselves: propose `poetry add
 ## Layout
 
 ```
-src/app/
-├── main.py      # uvicorn entrypoint (`make start`)
-├── api/         # app factory (lifespan builds Ollama client + embedder), routes.py, schemas.py
-├── core/        # config, jobs (SSE), db, chroma, embedder, ollama (LLM), ollama_runtime (model list/load)
-├── services/    # domain logic: Rustore*, EmbeddingIndexer, Retrieval, RAG; parsers/ = page parsers
-├── tasks/       # one coroutine per pipeline run, wiring services together
-└── models/      # SQLAlchemy ORM
+back/                # self-contained Poetry project; run Python tooling from here
+└── src/app/
+    ├── main.py      # uvicorn entrypoint (`make start`)
+    ├── api/         # app factory (lifespan builds Ollama client + embedder), routes.py, schemas.py
+    ├── core/        # config, jobs (SSE), db, chroma, embedder, ollama (LLM), ollama_runtime (model list/load)
+    ├── services/    # domain logic: Rustore*, EmbeddingIndexer, Retrieval, RAG; parsers/ = page parsers
+    ├── tasks/       # one coroutine per pipeline run, wiring services together
+    └── models/      # SQLAlchemy ORM
 
-front/src/       # FSD: app → pages → widgets → features → entities → shared
+front/src/           # FSD: app → pages → widgets → features → entities → shared
 
-saved_data/
+saved_data/          # gitignored runtime data at repo root, directories created on demand
 ├── categories/{timestamp}/*.txt   # app IDs per category per run
 ├── databases/{name}.sqlite3       # collected metadata
 ├── chroma/{name}/                 # vector index, one per database
+├── cache/                         # fastembed model cache
 └── config.json                    # user config overrides
 ```
+
+All paths derive from `BASE_DIR` (repo root) in `config.py` — don't hardcode paths elsewhere.
 
 **New store** = parser + service + task + endpoint + frontend feature/page.
 
 ## Configuration
 
-No `.env`. Defaults live in [src/app/core/config.py](src/app/core/config.py): fields with `init=True` on `Config` are tunable from the Settings page and persisted to `saved_data/config.json`; `init=False` fields (paths, RuStore URLs/categories, page count) are code-only.
+No `.env`. Defaults live in [back/src/app/core/config.py](back/src/app/core/config.py): fields with `init=True` on `Config` are tunable from the Settings page and persisted to `saved_data/config.json`; `init=False` fields (paths, RuStore URLs/categories, page count) are code-only.
 
 - `get_config()` returns fresh values after a save; the module-level `config` is a snapshot taken at import. Read tunable values via `get_config()` at call time.
 - Clients built in the app lifespan (Ollama base URL/timeout, embedder model/device) only pick up changes after a backend restart.
